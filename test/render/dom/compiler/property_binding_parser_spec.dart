@@ -8,15 +8,12 @@ import "package:angular2/src/render/dom/compiler/compile_pipeline.dart"
     show CompilePipeline;
 import "package:angular2/src/facade/collection.dart"
     show MapWrapper, ListWrapper;
-import "package:angular2/src/render/dom/compiler/compile_element.dart"
-    show CompileElement;
-import "package:angular2/src/render/dom/compiler/compile_step.dart"
-    show CompileStep;
-import "package:angular2/src/render/dom/compiler/compile_control.dart"
-    show CompileControl;
-import "package:angular2/change_detection.dart" show Lexer, Parser;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show Lexer, Parser;
 import "package:angular2/src/render/dom/view/proto_view_builder.dart"
     show ElementBinderBuilder;
+import "package:angular2/src/render/api.dart" show ViewDefinition, ViewType;
+import "pipeline_spec.dart" show MockStep;
 
 var EMPTY_MAP = new Map();
 main() {
@@ -33,9 +30,12 @@ main() {
         new PropertyBindingParser(new Parser(new Lexer()))
       ]);
     }
+    ViewDefinition createViewDefinition() {
+      return new ViewDefinition(componentId: "someComponent");
+    }
     List<ElementBinderBuilder> process(element, [hasNestedProtoView = false]) {
-      return ListWrapper.map(
-          createPipeline(hasNestedProtoView).process(element),
+      return ListWrapper.map(createPipeline(hasNestedProtoView).processElements(
+              element, ViewType.COMPONENT, createViewDefinition()),
           (compileElement) => compileElement.inheritedElementBinder);
     }
     it("should detect [] syntax", () {
@@ -170,14 +170,16 @@ main() {
       expect(eventBinding.fullName).toEqual("click");
     });
     it("should store bound properties as temporal attributes", () {
-      var results =
-          createPipeline().process(el("<div bind-a=\"b\" [c]=\"d\"></div>"));
+      var results = createPipeline().processElements(
+          el("<div bind-a=\"b\" [c]=\"d\"></div>"), ViewType.COMPONENT,
+          createViewDefinition());
       expect(results[0].attrs()["a"]).toEqual("b");
       expect(results[0].attrs()["c"]).toEqual("d");
     });
     it("should store variables as temporal attributes", () {
-      var results =
-          createPipeline().process(el("<div var-a=\"b\" #c=\"d\"></div>"));
+      var results = createPipeline().processElements(
+          el("<div var-a=\"b\" #c=\"d\"></div>"), ViewType.COMPONENT,
+          createViewDefinition());
       expect(results[0].attrs()["a"]).toEqual("b");
       expect(results[0].attrs()["c"]).toEqual("d");
     });
@@ -202,14 +204,4 @@ main() {
       expect(results[0].eventBindings[0].source.source).toEqual("b=\$event");
     });
   });
-}
-class MockStep implements CompileStep {
-  Function processClosure;
-  MockStep(process) {
-    this.processClosure = process;
-  }
-  process(
-      CompileElement parent, CompileElement current, CompileControl control) {
-    this.processClosure(parent, current, control);
-  }
 }

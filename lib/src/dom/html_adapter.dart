@@ -29,6 +29,14 @@ class Html5LibDomAdapter implements DomAdapter {
     stderr.writeln('${error}');
   }
 
+  log(error) {
+    stdout.writeln('${error}');
+  }
+  logGroup(error) {
+    stdout.writeln('${error}');
+  }
+  logGroupEnd() {}
+
   @override
   final attrToPropMap = const {
     'innerHtml': 'innerHTML',
@@ -176,6 +184,7 @@ class Html5LibDomAdapter implements DomAdapter {
   setChecked(el, bool value) {
     throw 'not implemented';
   }
+  createComment(String text) => new Comment(text);
   createTemplate(String html) => createElement('template')..innerHtml = html;
   createElement(tagName, [doc]) {
     return new Element.tag(tagName);
@@ -284,6 +293,9 @@ class Html5LibDomAdapter implements DomAdapter {
   importIntoDoc(node) {
     throw 'not implemented';
   }
+  adoptNode(node) {
+    throw 'not implemented';
+  }
   bool isPageRule(rule) {
     throw 'not implemented';
   }
@@ -309,10 +321,10 @@ class Html5LibDomAdapter implements DomAdapter {
     throw 'not implemented';
   }
   bool supportsDOMEvents() {
-    throw 'not implemented';
+    return false;
   }
   bool supportsNativeShadowDOM() {
-    throw 'not implemented';
+    return false;
   }
   getHistory() {
     throw 'not implemented';

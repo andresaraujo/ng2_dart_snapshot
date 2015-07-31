@@ -47,13 +47,13 @@ import "../change_detector_ref.dart" show ChangeDetectorRef;
  *     {{ 'abcdefghij' | limitTo: -100 }}    // output is 'abcdefghij'
  */
 class LimitToPipe implements Pipe {
-  static bool supportsObj(obj) {
+  static bool supportsObj(dynamic obj) {
     return isString(obj) || isArray(obj);
   }
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return LimitToPipe.supportsObj(obj);
   }
-  dynamic transform(value, [List<dynamic> args = null]) {
+  dynamic transform(dynamic value, [List<dynamic> args = null]) {
     if (isBlank(args) || args.length == 0) {
       throw new BaseException("limitTo pipe requires one argument");
     }
@@ -72,7 +72,7 @@ class LimitToPipe implements Pipe {
   void onDestroy() {}
 }
 class LimitToPipeFactory implements PipeFactory {
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return LimitToPipe.supportsObj(obj);
   }
   Pipe create(ChangeDetectorRef cdRef) {

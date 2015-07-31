@@ -9,6 +9,8 @@ import "package:angular2/src/core/annotations_impl/annotations.dart" as dirAnn;
 
 @Directive(selector: "someDirective")
 class SomeDirective {}
+@Directive(selector: "someChildDirective")
+class SomeChildDirective extends SomeDirective {}
 class SomeDirectiveWithoutAnnotation {}
 main() {
   describe("DirectiveResolver", () {
@@ -26,6 +28,11 @@ main() {
         reader.resolve(SomeDirectiveWithoutAnnotation);
       }).toThrowError(
           "No Directive annotation found on SomeDirectiveWithoutAnnotation");
+    });
+    it("should not read parent class Directive annotations", () {
+      var directiveMetadata = reader.resolve(SomeChildDirective);
+      expect(directiveMetadata)
+          .toEqual(new dirAnn.Directive(selector: "someChildDirective"));
     });
   });
 }

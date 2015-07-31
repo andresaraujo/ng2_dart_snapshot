@@ -5,7 +5,7 @@ import "package:angular2/src/facade/lang.dart" show Type, isPresent;
 import "package:angular2/src/facade/collection.dart" show Map, MapWrapper;
 
 /**
- * Resolve a {@link Type} from a {@link Component} into a URL.
+ * Resolve a `Type` from a {@link Component} into a URL.
  *
  * This interface can be overridden by the application developer to create custom behavior.
  *

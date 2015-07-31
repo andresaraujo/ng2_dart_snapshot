@@ -242,7 +242,8 @@ class SelectorMatcher {
    * @param matchedCallback This callback will be called with the object handed into `addSelectable`
    * @return boolean true if a match was found
   */
-  bool match(CssSelector cssSelector, matchedCallback) {
+  bool match(CssSelector cssSelector,
+      dynamic /* (CssSelector, any) => void */ matchedCallback) {
     var result = false;
     var element = cssSelector.element;
     var classNames = cssSelector.classNames;
@@ -346,7 +347,8 @@ class SelectorContext {
   SelectorContext(this.selector, this.cbContext, this.listContext) {
     this.notSelectors = selector.notSelectors;
   }
-  bool finalize(CssSelector cssSelector, callback) {
+  bool finalize(CssSelector cssSelector,
+      dynamic /* (CssSelector, any) => void */ callback) {
     var result = true;
     if (this.notSelectors.length > 0 &&
         (isBlank(this.listContext) || !this.listContext.alreadyMatched)) {

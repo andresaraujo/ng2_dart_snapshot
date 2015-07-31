@@ -34,7 +34,13 @@ class IterableMap extends IterableBase<List> {
 
 class MapWrapper {
   static Map clone(Map m) => new Map.from(m);
+
+  // in opposite to JS, Dart does not create a new map
   static Map createFromStringMap(Map m) => m;
+
+  // in opposite to JS, Dart does not create a new map
+  static Map toStringMap(Map m) => m;
+
   static Map createFromPairs(List pairs) => pairs.fold({}, (m, p) {
     m[p[0]] = p[1];
     return m;
@@ -42,6 +48,7 @@ class MapWrapper {
   static forEach(Map m, fn(v, k)) {
     m.forEach((k, v) => fn(v, k));
   }
+  static get(Map map, key) => map[key];
   static int size(Map m) => m.length;
   static void delete(Map m, k) {
     m.remove(k);
@@ -195,8 +202,6 @@ class ListWrapper {
 
 bool isListLikeIterable(obj) => obj is Iterable;
 
-List iterableToList(Iterable ii) => ii.toList();
-
 void iterateListLike(iter, fn(item)) {
   assert(iter is Iterable);
   for (var item in iter) {
@@ -207,4 +212,7 @@ void iterateListLike(iter, fn(item)) {
 class SetWrapper {
   static Set createFromList(List l) => new Set.from(l);
   static bool has(Set s, key) => s.contains(key);
+  static void delete(Set m, k) {
+    m.remove(k);
+  }
 }

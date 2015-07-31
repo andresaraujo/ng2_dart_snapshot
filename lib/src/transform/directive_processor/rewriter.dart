@@ -7,9 +7,11 @@ import 'package:angular2/src/render/xhr.dart' show XHR;
 import 'package:angular2/src/transform/common/annotation_matcher.dart';
 import 'package:angular2/src/transform/common/asset_reader.dart';
 import 'package:angular2/src/transform/common/async_string_writer.dart';
+import 'package:angular2/src/transform/common/interface_matcher.dart';
 import 'package:angular2/src/transform/common/logging.dart';
 import 'package:angular2/src/transform/common/names.dart';
 import 'package:angular2/src/transform/common/xhr_impl.dart';
+import 'package:angular2/src/transform/common/ng_meta.dart';
 import 'package:barback/barback.dart' show AssetId;
 import 'package:path/path.dart' as path;
 
@@ -23,12 +25,14 @@ import 'visitors.dart';
 /// string unless `forceGenerate` is true, in which case an empty ngDeps
 /// file is created.
 Future<String> createNgDeps(AssetReader reader, AssetId assetId,
-    AnnotationMatcher annotationMatcher, bool inlineViews) async {
+    AnnotationMatcher annotationMatcher, NgMeta ngMeta,
+    {bool inlineViews}) async {
   // TODO(kegluneq): Shortcut if we can determine that there are no
   // [Directive]s present, taking into account `export`s.
   var writer = new AsyncStringWriter();
   var visitor = new CreateNgDepsVisitor(writer, assetId,
-      new XhrImpl(reader, assetId), annotationMatcher, inlineViews);
+      new XhrImpl(reader, assetId), annotationMatcher, _interfaceMatcher,
+      ngMeta, inlineViews: inlineViews);
   var code = await reader.readAsString(assetId);
   parseCompilationUnit(code, name: assetId.path).accept(visitor);
 
@@ -40,14 +44,25 @@ Future<String> createNgDeps(AssetReader reader, AssetId assetId,
   return await writer.asyncToString();
 }
 
+InterfaceMatcher _interfaceMatcher = new InterfaceMatcher();
+
 /// Visitor responsible for processing [CompilationUnit] and creating an
 /// associated .ng_deps.dart file.
 class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
   final AsyncStringWriter writer;
+
+  /// Output ngMeta information about aliases.
+  // TODO(sigmund): add more to ngMeta. Currently this only contains aliasing
+  // information, but we could produce here all the metadata we need and avoid
+  // parsing the ngdeps files later.
+  final NgMeta ngMeta;
+
   /// Whether an Angular 2 `Injectable` has been found.
   bool _foundNgInjectable = false;
+
   /// Whether this library `imports` or `exports` any non-'dart:' libraries.
   bool _usesNonLangLibs = false;
+
   /// Whether we have written an import of base file
   /// (the file we are processing).
   bool _wroteBaseLibImport = false;
@@ -56,18 +71,24 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
   final ParameterTransformVisitor _paramsVisitor;
   final AnnotationsTransformVisitor _metaVisitor;
   final AnnotationMatcher _annotationMatcher;
+  final InterfaceMatcher _interfaceMatcher;
 
   /// The assetId for the file which we are parsing.
   final AssetId assetId;
 
-  CreateNgDepsVisitor(AsyncStringWriter writer, this.assetId, XHR xhr,
-      this._annotationMatcher, inlineViews)
+  CreateNgDepsVisitor(AsyncStringWriter writer, AssetId assetId, XHR xhr,
+      AnnotationMatcher annotationMatcher, InterfaceMatcher interfaceMatcher,
+      this.ngMeta, {bool inlineViews})
       : writer = writer,
         _copyVisitor = new ToSourceVisitor(writer),
         _factoryVisitor = new FactoryTransformVisitor(writer),
         _paramsVisitor = new ParameterTransformVisitor(writer),
         _metaVisitor = new AnnotationsTransformVisitor(
-            writer, xhr, inlineViews);
+            writer, xhr, annotationMatcher, interfaceMatcher, assetId,
+            inlineViews: inlineViews),
+        _annotationMatcher = annotationMatcher,
+        _interfaceMatcher = interfaceMatcher,
+        this.assetId = assetId;
 
   void _visitNodeListWithSeparator(NodeList<AstNode> list, String separator) {
     if (list == null) return;
@@ -93,7 +114,10 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
   void _maybeWriteImport() {
     if (_wroteBaseLibImport) return;
     _wroteBaseLibImport = true;
-    writer.print('''import '${path.basename(assetId.path)}';''');
+    var origDartFile = path.basename(assetId.path);
+    writer.print('''import '$origDartFile';''');
+    writer.print('''export '$origDartFile';''');
+    writer.print("import '$_REFLECTOR_IMPORT' as $_REF_PREFIX;");
   }
 
   void _updateUsesNonLangLibs(UriBasedDirective directive) {
@@ -105,6 +129,11 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
   Object visitImportDirective(ImportDirective node) {
     _maybeWriteImport();
     _updateUsesNonLangLibs(node);
+    // Ignore deferred imports here so as to not load the deferred libraries
+    // code in the current library causing much of the code to not be
+    // deferred. Instead `DeferredRewriter` will rewrite the code as to load
+    // `ng_deps` in a deferred way.
+    if (node.deferredKeyword != null) return null;
     return node.accept(_copyVisitor);
   }
 
@@ -118,7 +147,7 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
   void _openFunctionWrapper() {
     _maybeWriteImport();
     writer.print('var _visited = false;'
-        'void ${SETUP_METHOD_NAME}(${REFLECTOR_VAR_NAME}) {'
+        'void ${SETUP_METHOD_NAME}() {'
         'if (_visited) return; _visited = true;');
   }
 
@@ -166,7 +195,8 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
 
   @override
   Object visitClassDeclaration(ClassDeclaration node) {
-    if (!node.metadata.any((a) => _annotationMatcher.hasMatch(a, assetId))) {
+    if (!node.metadata
+        .any((a) => _annotationMatcher.hasMatch(a.name, assetId))) {
       return null;
     }
 
@@ -175,30 +205,54 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
     _maybeWriteReflector();
     writer.print('..registerType(');
     node.name.accept(this);
-    writer.print(''', {'factory': ''');
-    if (ctor == null) {
-      _generateEmptyFactory(node.name.toString());
-    } else {
-      ctor.accept(_factoryVisitor);
-    }
-    writer.print(''', 'parameters': ''');
+    writer.print(', new ${_REF_PREFIX}.ReflectionInfo(');
+    node.accept(_metaVisitor);
+    writer.print(', ');
     if (ctor == null) {
       _generateEmptyParams();
     } else {
       ctor.accept(_paramsVisitor);
     }
-    writer.print(''', 'annotations': ''');
-    node.accept(_metaVisitor);
+    writer.print(', ');
+    if (ctor == null) {
+      _generateEmptyFactory(node.name.toString());
+    } else {
+      ctor.accept(_factoryVisitor);
+    }
     if (node.implementsClause != null &&
         node.implementsClause.interfaces != null &&
         node.implementsClause.interfaces.isNotEmpty) {
-      writer.print(''', 'interfaces': const [''');
-      writer.print(node.implementsClause.interfaces
-          .map((interface) => interface.name)
-          .join(', '));
-      writer.print(']');
+      writer
+        ..print(', const [')
+        ..print(node.implementsClause.interfaces
+            .map((interface) => interface.name)
+            .join(', '))
+        ..print(']');
     }
-    writer.print('})');
+    writer.print('))');
+    return null;
+  }
+
+  @override
+  Object visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
+    // We process any top-level declaration that fits the directive-alias
+    // declaration pattern. Ideally we would use an annotation on the field to
+    // help us filter out only what's needed, but unfortunately TypeScript
+    // doesn't support decorators on variable declarations (see
+    // angular/angular#1747 and angular/ts2dart#249 for context).
+    outer: for (var variable in node.variables.variables) {
+      var initializer = variable.initializer;
+      if (initializer != null && initializer is ListLiteral) {
+        var otherNames = [];
+        for (var exp in initializer.elements) {
+          // Only simple identifiers are supported for now.
+          // TODO(sigmund): add support for prefixes (see issue #3232).
+          if (exp is! SimpleIdentifier) continue outer;
+          otherNames.add(exp.name);
+        }
+        ngMeta.aliases[variable.name.name] = otherNames;
+      }
+    }
     return null;
   }
 
@@ -235,18 +289,19 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
 
   @override
   bool visitFunctionDeclaration(FunctionDeclaration node) {
-    if (!node.metadata.any((a) => _annotationMatcher.hasMatch(a, assetId))) {
+    if (!node.metadata
+        .any((a) => _annotationMatcher.hasMatch(a.name, assetId))) {
       return null;
     }
 
     _maybeWriteReflector();
     writer.print('..registerFunction(');
     node.name.accept(this);
-    writer.print(''', {'parameters': const [''');
-    node.functionExpression.parameters.accept(_paramsVisitor);
-    writer.print('''], 'annotations': ''');
+    writer.print(', new ${_REF_PREFIX}.ReflectionInfo(const [');
     node.metadata.accept(_metaVisitor);
-    writer.print('})');
+    writer.print('], const [');
+    node.functionExpression.parameters.accept(_paramsVisitor);
+    writer.print(']))');
     return null;
   }
 
@@ -256,6 +311,9 @@ class CreateNgDepsVisitor extends Object with SimpleAstVisitor<Object> {
     _foundNgInjectable = true;
 
     // The receiver for cascaded calls.
-    writer.print(REFLECTOR_VAR_NAME);
+    writer.print('$_REF_PREFIX.$REFLECTOR_VAR_NAME');
   }
 }
+
+const _REF_PREFIX = '_ngRef';
+const _REFLECTOR_IMPORT = 'package:angular2/src/reflection/reflection.dart';

@@ -22,13 +22,18 @@ import "package:angular2/src/core/annotations/decorators.dart"
 import "package:angular2/src/core/annotations_impl/view.dart" as annotations;
 import "package:angular2/src/facade/lang.dart" show NumberWrapper, isPresent;
 import "package:angular2/src/facade/async.dart"
-    show Future, PromiseWrapper, EventEmitter, ObservableWrapper;
+    show
+        Future,
+        PromiseWrapper,
+        PromiseCompleter,
+        EventEmitter,
+        ObservableWrapper;
 import "package:angular2/src/router/router.dart" show RootRouter;
 import "package:angular2/src/router/pipeline.dart" show Pipeline;
 import "package:angular2/router.dart"
     show Router, RouterOutlet, RouterLink, RouteParams;
 import "package:angular2/src/router/route_config_decorator.dart"
-    show RouteConfig;
+    show RouteConfig, Route, AsyncRoute, Redirect;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
 import "package:angular2/src/mock/location_mock.dart" show SpyLocation;
 import "package:angular2/src/router/location.dart" show Location;
@@ -41,7 +46,8 @@ import "package:angular2/src/router/instruction.dart" show Instruction;
 import "package:angular2/src/core/compiler/directive_resolver.dart"
     show DirectiveResolver;
 
-var cmpInstanceCount, log, eventBus, completer;
+var cmpInstanceCount, log, eventBus;
+PromiseCompleter<dynamic> completer;
 main() {
   describe("Outlet Directive", () {
     TestComponentBuilder tcb;
@@ -79,7 +85,8 @@ main() {
     }
     it("should work in a simple case", inject([AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/test", "component": HelloCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/test", component: HelloCmp)]))
           .then((_) => rtr.navigate("/test"))
           .then((_) {
         rootTC.detectChanges();
@@ -90,8 +97,8 @@ main() {
     it("should navigate between components with different parameters", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then(
-              (_) => rtr.config({"path": "/user/:name", "component": UserCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/user/:name", component: UserCmp)]))
           .then((_) => rtr.navigate("/user/brian"))
           .then((_) {
         rootTC.detectChanges();
@@ -104,7 +111,8 @@ main() {
     }));
     it("should work with child routers", inject([AsyncTestCompleter], (async) {
       compile("outer { <router-outlet></router-outlet> }")
-          .then((_) => rtr.config({"path": "/a/...", "component": ParentCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/a/...", component: ParentCmp)]))
           .then((_) => rtr.navigate("/a/b"))
           .then((_) {
         rootTC.detectChanges();
@@ -117,9 +125,10 @@ main() {
       Location
     ], (async, location) {
       compile()
-          .then((_) =>
-              rtr.config({"path": "/original", "redirectTo": "/redirected"}))
-          .then((_) => rtr.config({"path": "/redirected", "component": A}))
+          .then((_) => rtr.config([
+        new Redirect(path: "/original", redirectTo: "/redirected"),
+        new Route(path: "/redirected", component: A)
+      ]))
           .then((_) => rtr.navigate("/original"))
           .then((_) {
         rootTC.detectChanges();
@@ -136,8 +145,8 @@ main() {
         [AsyncTestCompleter], (async) {
       location.setBaseHref("/my/base");
       compile("<a href=\"hello\" [router-link]=\"['./user']\"></a>")
-          .then((_) =>
-              rtr.config({"path": "/user", "component": UserCmp, "as": "user"}))
+          .then((_) => rtr.config(
+              [new Route(path: "/user", component: UserCmp, as: "user")]))
           .then((_) => rtr.navigate("/a/b"))
           .then((_) {
         rootTC.detectChanges();
@@ -148,8 +157,8 @@ main() {
     it("should generate link hrefs without params", inject([AsyncTestCompleter],
         (async) {
       compile("<a href=\"hello\" [router-link]=\"['./user']\"></a>")
-          .then((_) =>
-              rtr.config({"path": "/user", "component": UserCmp, "as": "user"}))
+          .then((_) => rtr.config(
+              [new Route(path: "/user", component: UserCmp, as: "user")]))
           .then((_) => rtr.navigate("/a/b"))
           .then((_) {
         rootTC.detectChanges();
@@ -160,8 +169,8 @@ main() {
     it("should reuse common parent components", inject([AsyncTestCompleter],
         (async) {
       compile()
-          .then((_) =>
-              rtr.config({"path": "/team/:id/...", "component": TeamCmp}))
+          .then((_) => rtr
+              .config([new Route(path: "/team/:id/...", component: TeamCmp)]))
           .then((_) => rtr.navigate("/team/angular/user/rado"))
           .then((_) {
         rootTC.detectChanges();
@@ -179,7 +188,7 @@ main() {
         (async) {
       compile("<a href=\"hello\" [router-link]=\"['./user', {name: name}]\">{{name}}</a>")
           .then((_) => rtr.config(
-              {"path": "/user/:name", "component": UserCmp, "as": "user"}))
+              [new Route(path: "/user/:name", component: UserCmp, as: "user")]))
           .then((_) => rtr.navigate("/a/b"))
           .then((_) {
         rootTC.componentInstance.name = "brian";
@@ -194,16 +203,14 @@ main() {
     it("should generate link hrefs from a child to its sibling", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({
-        "path": "/page/:number",
-        "component": SiblingPageCmp,
-        "as": "page"
-      }))
+          .then((_) => rtr.config([
+        new Route(path: "/page/:number", component: SiblingPageCmp, as: "page")
+      ]))
           .then((_) => rtr.navigate("/page/1"))
           .then((_) {
         rootTC.detectChanges();
         expect(DOM.getAttribute(rootTC.componentViewChildren[
-                1].componentViewChildren[0].children[0].nativeElement, "href"))
+                1].componentViewChildren[0].nativeElement, "href"))
             .toEqual("/page/2");
         async.done();
       });
@@ -211,24 +218,25 @@ main() {
     it("should generate relative links preserving the existing parent route",
         inject([AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config(
-              {"path": "/book/:title/...", "component": BookCmp, "as": "book"}))
+          .then((_) => rtr.config([
+        new Route(path: "/book/:title/...", component: BookCmp, as: "book")
+      ]))
           .then((_) => rtr.navigate("/book/1984/page/1"))
           .then((_) {
         rootTC.detectChanges();
         expect(DOM.getAttribute(rootTC.componentViewChildren[
                 1].componentViewChildren[0].nativeElement, "href"))
             .toEqual("/book/1984/page/100");
-        expect(DOM.getAttribute(
-                rootTC.componentViewChildren[1].componentViewChildren[
-                2].componentViewChildren[0].children[0].nativeElement, "href"))
-            .toEqual("/book/1984/page/2");
+        expect(DOM.getAttribute(rootTC.componentViewChildren[
+            1].componentViewChildren[2].componentViewChildren[0].nativeElement,
+            "href")).toEqual("/book/1984/page/2");
         async.done();
       });
     }));
     it("should call the onActivate hook", inject([AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/on-activate"))
           .then((_) {
         rootTC.detectChanges();
@@ -240,7 +248,8 @@ main() {
     it("should wait for a parent component's onActivate hook to resolve before calling its child's",
         inject([AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) {
         ObservableWrapper.subscribe(eventBus, (ev) {
           if (ev.startsWith("parent activate")) {
@@ -259,7 +268,8 @@ main() {
     it("should call the onDeactivate hook", inject([AsyncTestCompleter],
         (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/on-deactivate"))
           .then((_) => rtr.navigate("/a"))
           .then((_) {
@@ -272,7 +282,8 @@ main() {
     it("should wait for a child component's onDeactivate hook to resolve before calling its parent's",
         inject([AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/parent-deactivate/child-deactivate"))
           .then((_) {
         ObservableWrapper.subscribe(eventBus, (ev) {
@@ -294,7 +305,8 @@ main() {
     it("should reuse a component when the canReuse hook returns false", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/on-reuse/1/a"))
           .then((_) {
         rootTC.detectChanges();
@@ -312,7 +324,8 @@ main() {
     it("should not reuse a component when the canReuse hook returns false",
         inject([AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/never-reuse/1/a"))
           .then((_) {
         rootTC.detectChanges();
@@ -330,7 +343,8 @@ main() {
     it("should navigate when canActivate returns true", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) {
         ObservableWrapper.subscribe(eventBus, (ev) {
           if (ev.startsWith("canActivate")) {
@@ -348,7 +362,8 @@ main() {
     it("should not navigate when canActivate returns false", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) {
         ObservableWrapper.subscribe(eventBus, (ev) {
           if (ev.startsWith("canActivate")) {
@@ -366,7 +381,8 @@ main() {
     it("should navigate away when canDeactivate returns true", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/can-deactivate/a"))
           .then((_) {
         rootTC.detectChanges();
@@ -388,7 +404,8 @@ main() {
     it("should not navigate away when canDeactivate returns false", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/can-deactivate/a"))
           .then((_) {
         rootTC.detectChanges();
@@ -410,7 +427,8 @@ main() {
     it("should run activation and deactivation hooks in the correct order",
         inject([AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/activation-hooks/child"))
           .then((_) {
         expect(log).toEqual("canActivate child: null -> /child;" +
@@ -431,7 +449,8 @@ main() {
     it("should only run reuse hooks when reusing", inject([AsyncTestCompleter],
         (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/reuse-hooks/1"))
           .then((_) {
         expect(log).toEqual("canActivate: null -> /reuse-hooks/1;" +
@@ -452,7 +471,8 @@ main() {
     it("should not run reuse hooks when not reusing", inject(
         [AsyncTestCompleter], (async) {
       compile()
-          .then((_) => rtr.config({"path": "/...", "component": LifecycleCmp}))
+          .then((_) =>
+              rtr.config([new Route(path: "/...", component: LifecycleCmp)]))
           .then((_) => rtr.navigate("/reuse-hooks/1"))
           .then((_) {
         expect(log).toEqual("canActivate: null -> /reuse-hooks/1;" +
@@ -483,8 +503,8 @@ main() {
       it("should navigate to link hrefs without params", inject(
           [AsyncTestCompleter], (async) {
         compile("<a href=\"hello\" [router-link]=\"['./user']\"></a>")
-            .then((_) => rtr
-                .config({"path": "/user", "component": UserCmp, "as": "user"}))
+            .then((_) => rtr.config(
+                [new Route(path: "/user", component: UserCmp, as: "user")]))
             .then((_) => rtr.navigate("/a/b"))
             .then((_) {
           rootTC.detectChanges();
@@ -502,8 +522,8 @@ main() {
           [AsyncTestCompleter], (async) {
         location.setBaseHref("/base");
         compile("<a href=\"hello\" [router-link]=\"['./user']\"></a>")
-            .then((_) => rtr
-                .config({"path": "/user", "component": UserCmp, "as": "user"}))
+            .then((_) => rtr.config(
+                [new Route(path: "/user", component: UserCmp, as: "user")]))
             .then((_) => rtr.navigate("/a/b"))
             .then((_) {
           rootTC.detectChanges();
@@ -560,7 +580,7 @@ class SiblingPageCmp {
     <router-outlet></router-outlet>''',
     directives: const [RouterLink, RouterOutlet])
 @RouteConfig(const [
-  const {"path": "/page/:number", "component": SiblingPageCmp, "as": "page"}
+  const Route(path: "/page/:number", component: SiblingPageCmp, as: "page")
 ])
 class BookCmp {
   String title;
@@ -572,7 +592,7 @@ class BookCmp {
 @View(
     template: "inner { <router-outlet></router-outlet> }",
     directives: const [RouterOutlet])
-@RouteConfig(const [const {"path": "/b", "component": HelloCmp}])
+@RouteConfig(const [const Route(path: "/b", component: HelloCmp)])
 class ParentCmp {
   ParentCmp() {}
 }
@@ -580,7 +600,7 @@ class ParentCmp {
 @View(
     template: "team {{id}} { <router-outlet></router-outlet> }",
     directives: const [RouterOutlet])
-@RouteConfig(const [const {"path": "/user/:name", "component": UserCmp}])
+@RouteConfig(const [const Route(path: "/user/:name", component: UserCmp)])
 class TeamCmp {
   String id;
   TeamCmp(RouteParams params) {
@@ -614,7 +634,7 @@ class ActivateCmp implements OnActivate {
     template: '''parent {<router-outlet></router-outlet>}''',
     directives: const [RouterOutlet])
 @RouteConfig(
-    const [const {"path": "/child-activate", "component": ActivateCmp}])
+    const [const Route(path: "/child-activate", component: ActivateCmp)])
 class ParentActivateCmp implements OnActivate {
   Future<dynamic> onActivate(Instruction next, Instruction prev) {
     completer = PromiseWrapper.completer();
@@ -642,8 +662,9 @@ class WaitDeactivateCmp implements OnDeactivate {
 @View(
     template: '''parent {<router-outlet></router-outlet>}''',
     directives: const [RouterOutlet])
-@RouteConfig(
-    const [const {"path": "/child-deactivate", "component": WaitDeactivateCmp}])
+@RouteConfig(const [
+  const Route(path: "/child-deactivate", component: WaitDeactivateCmp)
+])
 class ParentDeactivateCmp implements OnDeactivate {
   onDeactivate(Instruction next, Instruction prev) {
     logHook("parent deactivate", next, prev);
@@ -654,8 +675,8 @@ class ParentDeactivateCmp implements OnDeactivate {
     template: '''reuse {<router-outlet></router-outlet>}''',
     directives: const [RouterOutlet])
 @RouteConfig(const [
-  const {"path": "/a", "component": A},
-  const {"path": "/b", "component": B}
+  const Route(path: "/a", component: A),
+  const Route(path: "/b", component: B)
 ])
 class ReuseCmp implements OnReuse, CanReuse {
   ReuseCmp() {
@@ -673,8 +694,8 @@ class ReuseCmp implements OnReuse, CanReuse {
     template: '''reuse {<router-outlet></router-outlet>}''',
     directives: const [RouterOutlet])
 @RouteConfig(const [
-  const {"path": "/a", "component": A},
-  const {"path": "/b", "component": B}
+  const Route(path: "/a", component: A),
+  const Route(path: "/b", component: B)
 ])
 class NeverReuseCmp implements OnReuse, CanReuse {
   NeverReuseCmp() {
@@ -692,8 +713,8 @@ class NeverReuseCmp implements OnReuse, CanReuse {
     template: '''canActivate {<router-outlet></router-outlet>}''',
     directives: const [RouterOutlet])
 @RouteConfig(const [
-  const {"path": "/a", "component": A},
-  const {"path": "/b", "component": B}
+  const Route(path: "/a", component: A),
+  const Route(path: "/b", component: B)
 ])
 @CanActivate(CanActivateCmp.canActivate)
 class CanActivateCmp {
@@ -708,8 +729,8 @@ class CanActivateCmp {
     template: '''canDeactivate {<router-outlet></router-outlet>}''',
     directives: const [RouterOutlet])
 @RouteConfig(const [
-  const {"path": "/a", "component": A},
-  const {"path": "/b", "component": B}
+  const Route(path: "/a", component: A),
+  const Route(path: "/b", component: B)
 ])
 class CanDeactivateCmp implements CanDeactivate {
   canDeactivate(Instruction next, Instruction prev) {
@@ -741,7 +762,7 @@ class AllHooksChildCmp implements CanDeactivate, OnDeactivate, OnActivate {
 @View(
     template: '''<router-outlet></router-outlet>''',
     directives: const [RouterOutlet])
-@RouteConfig(const [const {"path": "/child", "component": AllHooksChildCmp}])
+@RouteConfig(const [const Route(path: "/child", component: AllHooksChildCmp)])
 @CanActivate(AllHooksParentCmp.canActivate)
 class AllHooksParentCmp implements CanDeactivate, OnDeactivate, OnActivate {
   canDeactivate(Instruction next, Instruction prev) {
@@ -792,16 +813,16 @@ class ReuseHooksCmp
     template: '''<router-outlet></router-outlet>''',
     directives: const [RouterOutlet])
 @RouteConfig(const [
-  const {"path": "/a", "component": A},
-  const {"path": "/on-activate", "component": ActivateCmp},
-  const {"path": "/parent-activate/...", "component": ParentActivateCmp},
-  const {"path": "/on-deactivate", "component": DeactivateCmp},
-  const {"path": "/parent-deactivate/...", "component": ParentDeactivateCmp},
-  const {"path": "/on-reuse/:number/...", "component": ReuseCmp},
-  const {"path": "/never-reuse/:number/...", "component": NeverReuseCmp},
-  const {"path": "/can-activate/...", "component": CanActivateCmp},
-  const {"path": "/can-deactivate/...", "component": CanDeactivateCmp},
-  const {"path": "/activation-hooks/...", "component": AllHooksParentCmp},
-  const {"path": "/reuse-hooks/:number", "component": ReuseHooksCmp}
+  const Route(path: "/a", component: A),
+  const Route(path: "/on-activate", component: ActivateCmp),
+  const Route(path: "/parent-activate/...", component: ParentActivateCmp),
+  const Route(path: "/on-deactivate", component: DeactivateCmp),
+  const Route(path: "/parent-deactivate/...", component: ParentDeactivateCmp),
+  const Route(path: "/on-reuse/:number/...", component: ReuseCmp),
+  const Route(path: "/never-reuse/:number/...", component: NeverReuseCmp),
+  const Route(path: "/can-activate/...", component: CanActivateCmp),
+  const Route(path: "/can-deactivate/...", component: CanDeactivateCmp),
+  const Route(path: "/activation-hooks/...", component: AllHooksParentCmp),
+  const Route(path: "/reuse-hooks/:number", component: ReuseHooksCmp)
 ])
 class LifecycleCmp {}

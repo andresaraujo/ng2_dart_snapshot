@@ -3,7 +3,7 @@ library angular2.test.change_detection.change_detector_config;
 import "package:angular2/src/facade/collection.dart"
     show ListWrapper, MapWrapper, StringMapWrapper;
 import "package:angular2/src/facade/lang.dart" show isBlank, isPresent;
-import "package:angular2/change_detection.dart"
+import "package:angular2/src/change_detection/change_detection.dart"
     show
         DEFAULT,
         ON_PUSH,
@@ -72,7 +72,7 @@ TestDefinition getDefinition(String id) {
     var bindingRecords = _createBindingRecords(id);
     var directiveRecords = [];
     var cdDef = new ChangeDetectorDefinition(
-        id, strategy, variableBindings, bindingRecords, directiveRecords);
+        id, strategy, variableBindings, bindingRecords, directiveRecords, true);
     testDef = new TestDefinition(id, cdDef, null);
   }
   if (isBlank(testDef)) {
@@ -110,7 +110,7 @@ class _ExpressionWithLocals {
     var bindingRecords = _createBindingRecords(this._expression);
     var directiveRecords = [];
     return new ChangeDetectorDefinition("(empty id)", strategy,
-        variableBindings, bindingRecords, directiveRecords);
+        variableBindings, bindingRecords, directiveRecords, true);
   }
   /**
    * Map from test id to _ExpressionWithLocals.
@@ -153,7 +153,7 @@ class _ExpressionWithMode {
       directiveRecords = [];
     }
     return new ChangeDetectorDefinition("(empty id)", this._strategy,
-        variableBindings, bindingRecords, directiveRecords);
+        variableBindings, bindingRecords, directiveRecords, true);
   }
   /**
    * Map from test id to _ExpressionWithMode.
@@ -173,7 +173,7 @@ class _DirectiveUpdating {
     var strategy = null;
     var variableBindings = [];
     return new ChangeDetectorDefinition("(empty id)", strategy,
-        variableBindings, this._bindingRecords, this._directiveRecords);
+        variableBindings, this._bindingRecords, this._directiveRecords, true);
   }
   static BindingRecord updateA(String expression, dirRecord) {
     return BindingRecord.createForDirective(
@@ -249,6 +249,7 @@ class _DirectiveUpdating {
  * equivalent to their ids.
  */
 var _availableDefinitions = [
+  "\"\$\"",
   "10",
   "\"str\"",
   "\"a\n\nb\"",
@@ -289,6 +290,7 @@ var _availableDefinitions = [
   "{z: 1}",
   "{z: a}",
   "name | pipe",
+  "(name | pipe).length",
   "name | pipe:'one':address.city",
   "value",
   "a",

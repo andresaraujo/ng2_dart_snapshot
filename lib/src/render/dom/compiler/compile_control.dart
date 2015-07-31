@@ -18,8 +18,8 @@ class CompileControl {
   bool _ignoreCurrentElement;
   CompileControl(this._steps) {}
   // only public so that it can be used by compile_pipeline
-  List<CompileElement> internalProcess(List<dynamic> results, startStepIndex,
-      CompileElement parent, CompileElement current) {
+  List<CompileElement> internalProcess(List<dynamic> results,
+      num startStepIndex, CompileElement parent, CompileElement current) {
     this._results = results;
     var previousStepIndex = this._currentStepIndex;
     var previousParent = this._parent;
@@ -30,7 +30,7 @@ class CompileControl {
       var step = this._steps[i];
       this._parent = parent;
       this._currentStepIndex = i;
-      step.process(parent, current, this);
+      step.processElement(parent, current, this);
       parent = this._parent;
     }
     if (!this._ignoreCurrentElement) {

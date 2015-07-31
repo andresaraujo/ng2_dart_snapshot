@@ -3,7 +3,8 @@ library angular2.src.render.dom.compiler.property_binding_parser;
 import "package:angular2/src/facade/lang.dart"
     show isPresent, RegExpWrapper, StringWrapper;
 import "package:angular2/src/facade/collection.dart" show MapWrapper;
-import "package:angular2/change_detection.dart" show Parser;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show Parser;
 import "compile_step.dart" show CompileStep;
 import "compile_element.dart" show CompileElement;
 import "compile_control.dart" show CompileControl;
@@ -31,7 +32,10 @@ var BIND_NAME_REGEXP = new RegExp(
 class PropertyBindingParser implements CompileStep {
   Parser _parser;
   PropertyBindingParser(this._parser) {}
-  process(
+  String processStyle(String style) {
+    return style;
+  }
+  processElement(
       CompileElement parent, CompileElement current, CompileControl control) {
     var attrs = current.attrs();
     var newAttrs = new Map();

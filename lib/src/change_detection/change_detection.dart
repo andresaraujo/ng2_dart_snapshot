@@ -9,8 +9,8 @@ import "pipes/iterable_changes.dart" show IterableChangesFactory;
 import "pipes/keyvalue_changes.dart" show KeyValueChangesFactory;
 import "pipes/observable_pipe.dart" show ObservablePipeFactory;
 import "pipes/promise_pipe.dart" show PromisePipeFactory;
-import "pipes/uppercase_pipe.dart" show UpperCaseFactory;
-import "pipes/lowercase_pipe.dart" show LowerCaseFactory;
+import "pipes/uppercase_pipe.dart" show UpperCasePipe;
+import "pipes/lowercase_pipe.dart" show LowerCasePipe;
 import "pipes/json_pipe.dart" show JsonPipe;
 import "pipes/limit_to_pipe.dart" show LimitToPipeFactory;
 import "pipes/date_pipe.dart" show DatePipe;
@@ -23,6 +23,40 @@ import "package:angular2/di.dart"
 import "package:angular2/src/facade/collection.dart"
     show List, Map, StringMapWrapper;
 import "package:angular2/src/facade/lang.dart" show isPresent, BaseException;
+export "parser/ast.dart"
+    show
+        ASTWithSource,
+        AST,
+        AstTransformer,
+        AccessMember,
+        LiteralArray,
+        ImplicitReceiver;
+export "parser/lexer.dart" show Lexer;
+export "parser/parser.dart" show Parser;
+export "parser/locals.dart" show Locals;
+export "exceptions.dart"
+    show
+        DehydratedException,
+        ExpressionChangedAfterItHasBeenCheckedException,
+        ChangeDetectionError;
+export "interfaces.dart"
+    show
+        ProtoChangeDetector,
+        ChangeDetector,
+        ChangeDispatcher,
+        ChangeDetection,
+        ChangeDetectorDefinition,
+        DebugContext;
+export "constants.dart"
+    show CHECK_ONCE, CHECK_ALWAYS, DETACHED, CHECKED, ON_PUSH, DEFAULT;
+export "proto_change_detector.dart" show DynamicProtoChangeDetector;
+export "binding_record.dart" show BindingRecord;
+export "directive_record.dart" show DirectiveIndex, DirectiveRecord;
+export "dynamic_change_detector.dart" show DynamicChangeDetector;
+export "change_detector_ref.dart" show ChangeDetectorRef;
+export "pipes/pipes.dart" show Pipes;
+export "pipes/pipe.dart" show WrappedValue, Pipe, PipeFactory, BasePipe;
+export "pipes/null_pipe.dart" show NullPipe, NullPipeFactory;
 
 /**
  * Structural diffing for `Object`s and `Map`s.
@@ -50,14 +84,14 @@ const List<PipeFactory> async = const [
  * Uppercase text transform.
  */
 const List<PipeFactory> uppercase = const [
-  const UpperCaseFactory(),
+  const UpperCasePipe(),
   const NullPipeFactory()
 ];
 /**
  * Lowercase text transform.
  */
 const List<PipeFactory> lowercase = const [
-  const LowerCaseFactory(),
+  const LowerCasePipe(),
   const NullPipeFactory()
 ];
 /**

@@ -28,7 +28,7 @@ main() {
         expect(text.trim()).toEqual("<p>hey</p>");
         async.done();
       });
-    }));
+    }), 10000);
     it("should reject the Promise on failure", inject([AsyncTestCompleter],
         (async) {
       PromiseWrapper.catchError(xhr.get(url404), (e) {
@@ -36,6 +36,6 @@ main() {
         async.done();
         return null;
       });
-    }));
+    }), 10000);
   });
 }

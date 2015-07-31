@@ -1,6 +1,6 @@
 library angular2.src.core.compiler.element_ref;
 
-import "package:angular2/src/facade/lang.dart" show BaseException;
+import "package:angular2/src/facade/lang.dart" show BaseException, isPresent;
 import "view_ref.dart" show ViewRef;
 import "package:angular2/src/render/api.dart"
     show RenderViewRef, RenderElementRef, Renderer;
@@ -25,9 +25,17 @@ class ElementRef implements RenderElementRef {
    * This is used internally by the Angular framework to locate elements.
    */
   num boundElementIndex;
-  ElementRef(ViewRef parentView, num boundElementIndex, this._renderer) {
+  /**
+   * Index of the element inside the `RenderViewRef`.
+   *
+   * This is used internally by the Angular framework to locate elements.
+   */
+  num renderBoundElementIndex;
+  ElementRef(ViewRef parentView, num boundElementIndex,
+      num renderBoundElementIndex, this._renderer) {
     this.parentView = parentView;
     this.boundElementIndex = boundElementIndex;
+    this.renderBoundElementIndex = renderBoundElementIndex;
   }
   /**
    *

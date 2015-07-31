@@ -66,18 +66,29 @@ class ProtoRecordBuilder {
         oldLast.bindingRecord.directiveRecord == b.directiveRecord) {
       oldLast.lastInDirective = false;
     }
+    var numberOfRecordsBefore = this.records.length;
     this._appendRecords(b, variableNames);
     var newLast = ListWrapper.last(this.records);
     if (isPresent(newLast) && !identical(newLast, oldLast)) {
       newLast.lastInBinding = true;
       newLast.lastInDirective = true;
+      this._setArgumentToPureFunction(numberOfRecordsBefore);
+    }
+  }
+  void _setArgumentToPureFunction(num startIndex) {
+    for (var i = startIndex; i < this.records.length; ++i) {
+      var rec = this.records[i];
+      if (rec.isPureFunction()) {
+        rec.args.forEach((recordIndex) =>
+            this.records[recordIndex - 1].argumentToPureFunction = true);
+      }
     }
   }
   _appendRecords(BindingRecord b, List<String> variableNames) {
     if (b.isDirectiveLifecycle()) {
       this.records.add(new ProtoRecord(RecordType.DIRECTIVE_LIFECYCLE,
           b.lifecycleEvent, null, [], [], -1, null, this.records.length + 1, b,
-          null, false, false));
+          null, false, false, false, false));
     } else {
       _ConvertAstIntoProtoRecords.append(this.records, b, variableNames);
     }
@@ -152,14 +163,14 @@ class _ConvertAstIntoProtoRecords implements AstVisitor {
   }
   num visitLiteralArray(LiteralArray ast) {
     var primitiveName = '''arrayFn${ ast . expressions . length}''';
-    return this._addRecord(RecordType.PRIMITIVE_OP, primitiveName,
+    return this._addRecord(RecordType.COLLECTION_LITERAL, primitiveName,
         _arrayFn(ast.expressions.length), this._visitAll(ast.expressions), null,
         0);
   }
   num visitLiteralMap(LiteralMap ast) {
-    return this._addRecord(RecordType.PRIMITIVE_OP, _mapPrimitiveName(ast.keys),
-        ChangeDetectionUtil.mapFn(ast.keys), this._visitAll(ast.values), null,
-        0);
+    return this._addRecord(RecordType.COLLECTION_LITERAL,
+        _mapPrimitiveName(ast.keys), ChangeDetectionUtil.mapFn(ast.keys),
+        this._visitAll(ast.values), null, 0);
   }
   num visitBinary(Binary ast) {
     var left = ast.left.visit(this);
@@ -213,11 +224,11 @@ class _ConvertAstIntoProtoRecords implements AstVisitor {
     if (context is DirectiveIndex) {
       this._records.add(new ProtoRecord(type, name, funcOrValue, args,
           fixedArgs, -1, context, selfIndex, this._bindingRecord,
-          this._expressionAsString, false, false));
+          this._expressionAsString, false, false, false, false));
     } else {
       this._records.add(new ProtoRecord(type, name, funcOrValue, args,
           fixedArgs, context, null, selfIndex, this._bindingRecord,
-          this._expressionAsString, false, false));
+          this._expressionAsString, false, false, false, false));
     }
     return selfIndex;
   }

@@ -5,17 +5,17 @@ import "package:angular2/src/facade/lang.dart"
 import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, MapWrapper, StringMapWrapper;
 import "proto_record.dart" show ProtoRecord;
-import "exceptions.dart"
-    show DehydratedException, ExpressionChangedAfterItHasBeenChecked;
 import "pipes/pipe.dart" show WrappedValue;
 import "constants.dart"
     show CHECK_ALWAYS, CHECK_ONCE, CHECKED, DETACHED, ON_PUSH;
 
-var uninitialized = new Object();
 class SimpleChange {
   dynamic previousValue;
   dynamic currentValue;
   SimpleChange(this.previousValue, this.currentValue) {}
+  bool isFirstChange() {
+    return identical(this.previousValue, ChangeDetectionUtil.uninitialized);
+  }
 }
 var _simpleChangesIndex = 0;
 var _simpleChanges = [
@@ -47,10 +47,9 @@ SimpleChange _simpleChange(previousValue, currentValue) {
   s.currentValue = currentValue;
   return s;
 }
+/* tslint:disable:requireParameterType */
 class ChangeDetectionUtil {
-  static Object uninitialized() {
-    return uninitialized;
-  }
+  static Object uninitialized = const Object();
   static List<dynamic> arrayFn0() {
     return [];
   }
@@ -179,12 +178,6 @@ class ChangeDetectionUtil {
       return value;
     }
   }
-  static throwOnChange(ProtoRecord proto, change) {
-    throw new ExpressionChangedAfterItHasBeenChecked(proto, change);
-  }
-  static throwDehydrated() {
-    throw new DehydratedException();
-  }
   static String changeDetectionMode(String strategy) {
     return strategy == ON_PUSH ? CHECK_ONCE : CHECK_ALWAYS;
   }
@@ -192,14 +185,13 @@ class ChangeDetectionUtil {
       dynamic previousValue, dynamic currentValue) {
     return _simpleChange(previousValue, currentValue);
   }
-  static Map<dynamic, dynamic> addChange(changes, String propertyName, change) {
-    if (isBlank(changes)) {
-      changes = {};
-    }
-    changes[propertyName] = change;
-    return changes;
-  }
   static bool isValueBlank(dynamic value) {
     return isBlank(value);
+  }
+  static String s(dynamic value) {
+    return isPresent(value) ? '''${ value}''' : "";
+  }
+  static ProtoRecord protoByIndex(List<ProtoRecord> protos, num selfIndex) {
+    return selfIndex < 1 ? null : protos[selfIndex - 1];
   }
 }

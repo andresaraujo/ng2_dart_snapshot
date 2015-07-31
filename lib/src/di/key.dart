@@ -34,7 +34,7 @@ class Key {
   /**
    * Retrieves a `Key` for a token.
    */
-  static Key get(token) {
+  static Key get(Object token) {
     return _globalKeyRegistry.get(resolveForwardRef(token));
   }
   /**

@@ -5,7 +5,8 @@ import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, Map, MapWrapper;
 import "package:angular2/src/facade/lang.dart"
     show isBlank, isPresent, normalizeBlank, BaseException;
-import "package:angular2/src/facade/async.dart" show PromiseWrapper, Future;
+import "package:angular2/src/facade/async.dart"
+    show PromiseCompleter, PromiseWrapper, Future;
 
 class MockXHR extends XHR {
   List<_Expectation> _expectations;
@@ -69,7 +70,7 @@ class MockXHR extends XHR {
 }
 class _PendingRequest {
   String url;
-  var completer;
+  PromiseCompleter<String> completer;
   _PendingRequest(url) {
     this.url = url;
     this.completer = PromiseWrapper.completer();

@@ -47,7 +47,7 @@ class NumberPipe extends BasePipe implements PipeFactory {
         currency: currency,
         currencyAsSymbol: currencyAsSymbol);
   }
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return isNumber(obj);
   }
   Pipe create(ChangeDetectorRef cdRef) {
@@ -81,7 +81,7 @@ class NumberPipe extends BasePipe implements PipeFactory {
  *     {{ 1 | number: '2.2' }}         // output is 01.00
  */
 class DecimalPipe extends NumberPipe {
-  String transform(value, List<dynamic> args) {
+  String transform(dynamic value, List<dynamic> args) {
     String digits = ListWrapper.first(args);
     return NumberPipe._format(value, NumberFormatStyle.DECIMAL, digits);
   }
@@ -97,7 +97,7 @@ class DecimalPipe extends NumberPipe {
  * For more information about `digitInfo` see {@link DecimalPipe}
  */
 class PercentPipe extends NumberPipe {
-  String transform(value, List<dynamic> args) {
+  String transform(dynamic value, List<dynamic> args) {
     String digits = ListWrapper.first(args);
     return NumberPipe._format(value, NumberFormatStyle.PERCENT, digits);
   }
@@ -117,7 +117,7 @@ class PercentPipe extends NumberPipe {
  * For more information about `digitInfo` see {@link DecimalPipe}
  */
 class CurrencyPipe extends NumberPipe {
-  String transform(value, List<dynamic> args) {
+  String transform(dynamic value, List<dynamic> args) {
     String currencyCode = isPresent(args) && args.length > 0 ? args[0] : "USD";
     bool symbolDisplay = isPresent(args) && args.length > 1 ? args[1] : false;
     String digits = isPresent(args) && args.length > 2 ? args[2] : null;

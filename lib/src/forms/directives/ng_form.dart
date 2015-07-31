@@ -1,7 +1,7 @@
 library angular2.src.forms.directives.ng_form;
 
 import "package:angular2/src/facade/async.dart"
-    show PromiseWrapper, ObservableWrapper, EventEmitter;
+    show PromiseWrapper, ObservableWrapper, EventEmitter, PromiseCompleter;
 import "package:angular2/src/facade/collection.dart"
     show StringMapWrapper, List, ListWrapper;
 import "package:angular2/src/facade/lang.dart" show isPresent, isBlank;
@@ -49,7 +49,7 @@ const formDirectiveBinding = const Binding(ControlContainer, toAlias: NgForm);
  */
 @Directive(
     selector: "form:not([ng-no-form]):not([ng-form-model]),ng-form,[ng-form]",
-    hostInjector: const [formDirectiveBinding],
+    bindings: const [formDirectiveBinding],
     host: const {"(submit)": "onSubmit()"},
     events: const ["ngSubmit"],
     exportAs: "form")
@@ -75,7 +75,7 @@ class NgForm extends ControlContainer implements Form {
   void addControl(NgControl dir) {
     this._later((_) {
       var container = this._findContainer(dir.path);
-      var c = new Control("");
+      var c = new Control();
       setUpControl(c, dir);
       container.addControl(dir.name, c);
       c.updateValidity();
@@ -130,7 +130,7 @@ class NgForm extends ControlContainer implements Form {
         : (this.form.find(path) as ControlGroup);
   }
   _later(fn) {
-    var c = PromiseWrapper.completer();
+    PromiseCompleter<dynamic> c = PromiseWrapper.completer();
     PromiseWrapper.then(c.promise, fn, (_) {});
     c.resolve(null);
   }

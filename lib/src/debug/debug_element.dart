@@ -49,9 +49,7 @@ class DebugElement {
    * @return {List<DebugElement>}
    */
   List<DebugElement> get children {
-    var thisElementBinder =
-        this._parentView.proto.elementBinders[this._boundElementIndex];
-    return this._getChildElements(this._parentView, thisElementBinder.index);
+    return this._getChildElements(this._parentView, this._boundElementIndex);
   }
   /**
    * Get the root DebugElement children of a component. Returns an empty
@@ -60,15 +58,14 @@ class DebugElement {
    * @return {List<DebugElement>}
    */
   List<DebugElement> get componentViewChildren {
-    var shadowView =
-        this._parentView.componentChildViews[this._boundElementIndex];
+    var shadowView = this._parentView.getNestedView(this._boundElementIndex);
     if (!isPresent(shadowView)) {
       // The current element is not a component.
       return [];
     }
     return this._getChildElements(shadowView, null);
   }
-  void triggerEventHandler(eventName, eventObj) {
+  void triggerEventHandler(String eventName, dynamic eventObj) {
     this._parentView.triggerEventHandlers(
         eventName, eventObj, this._boundElementIndex);
   }
@@ -96,7 +93,8 @@ class DebugElement {
    *
    * @return {DebugElement}
    */
-  DebugElement query(Predicate<DebugElement> predicate, [scope = Scope.all]) {
+  DebugElement query(Predicate<DebugElement> predicate,
+      [Function scope = Scope.all]) {
     var results = this.queryAll(predicate, scope);
     return results.length > 0 ? results[0] : null;
   }
@@ -110,7 +108,7 @@ class DebugElement {
    * @return {List<DebugElement>}
    */
   List<DebugElement> queryAll(Predicate<DebugElement> predicate,
-      [scope = Scope.all]) {
+      [Function scope = Scope.all]) {
     var elementsInScope = scope(this);
     return ListWrapper.filter(elementsInScope, predicate);
   }
@@ -119,13 +117,14 @@ class DebugElement {
     var els = [];
     var parentElementBinder = null;
     if (isPresent(parentBoundElementIndex)) {
-      parentElementBinder = view.proto.elementBinders[parentBoundElementIndex];
+      parentElementBinder = view.proto.elementBinders[
+          parentBoundElementIndex - view.elementOffset];
     }
     for (var i = 0; i < view.proto.elementBinders.length; ++i) {
       var binder = view.proto.elementBinders[i];
       if (binder.parent == parentElementBinder) {
-        els.add(new DebugElement(view, i));
-        var views = view.viewContainers[i];
+        els.add(new DebugElement(view, view.elementOffset + i));
+        var views = view.viewContainers[view.elementOffset + i];
         if (isPresent(views)) {
           ListWrapper.forEach(views.views, (nextView) {
             els =
@@ -144,7 +143,7 @@ List<dynamic> asNativeElements(List<DebugElement> arr) {
   return arr.map((debugEl) => debugEl.nativeElement).toList();
 }
 class Scope {
-  static List<DebugElement> all(debugElement) {
+  static List<DebugElement> all(DebugElement debugElement) {
     var scope = [];
     scope.add(debugElement);
     ListWrapper.forEach(debugElement.children, (child) {
@@ -155,7 +154,7 @@ class Scope {
     });
     return scope;
   }
-  static List<DebugElement> light(debugElement) {
+  static List<DebugElement> light(DebugElement debugElement) {
     var scope = [];
     ListWrapper.forEach(debugElement.children, (child) {
       scope.add(child);
@@ -163,7 +162,7 @@ class Scope {
     });
     return scope;
   }
-  static List<DebugElement> view(debugElement) {
+  static List<DebugElement> view(DebugElement debugElement) {
     var scope = [];
     ListWrapper.forEach(debugElement.componentViewChildren, (child) {
       scope.add(child);
@@ -178,7 +177,9 @@ class By {
   }
   static Predicate<DebugElement> css(String selector) {
     return (debugElement) {
-      return DOM.elementMatches(debugElement.nativeElement, selector);
+      return isPresent(debugElement.nativeElement)
+          ? DOM.elementMatches(debugElement.nativeElement, selector)
+          : false;
     };
   }
   static Predicate<DebugElement> directive(Type type) {

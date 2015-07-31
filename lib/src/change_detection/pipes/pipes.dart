@@ -6,7 +6,7 @@ import "package:angular2/src/facade/lang.dart"
     show isBlank, isPresent, BaseException;
 import "pipe.dart" show Pipe, PipeFactory;
 import "package:angular2/di.dart"
-    show Injectable, UnboundedMetadata, OptionalMetadata;
+    show Injectable, OptionalMetadata, SkipSelfMetadata;
 import "../change_detector_ref.dart" show ChangeDetectorRef;
 import "package:angular2/di.dart" show Binding;
 
@@ -23,7 +23,7 @@ class Pipes {
    *   'json': [jsonPipeFactory]
    * }
    * @Component({
-   *   viewInjector: [
+   *   viewBindings: [
    *     bind(Pipes).toValue(new Pipes(pipesConfig))
    *   ]
    * })
@@ -31,7 +31,8 @@ class Pipes {
    */
   final Map<String, List<PipeFactory>> config;
   const Pipes(Map<String, List<PipeFactory>> config) : config = config;
-  Pipe get(String type, obj, [ChangeDetectorRef cdRef, Pipe existingPipe]) {
+  Pipe get(String type, dynamic obj,
+      [ChangeDetectorRef cdRef, Pipe existingPipe]) {
     if (isPresent(existingPipe) &&
         existingPipe.supports(obj)) return existingPipe;
     if (isPresent(existingPipe)) existingPipe.onDestroy();
@@ -40,18 +41,18 @@ class Pipes {
     return factory.create(cdRef);
   }
   /**
-   * Takes a {@link Pipes} config object and returns a binding used to append the
-   * provided config to an inherited {@link Pipes} instance and return a new
+   * Takes a {@link Pipes} config object and returns a binding used to extend the
+   * inherited {@link Pipes} instance with the provided config and return a new
    * {@link Pipes} instance.
    *
    * If the provided config contains a key that is not yet present in the
    * inherited {@link Pipes}' config, a new {@link PipeFactory} list will be created
    * for that key. Otherwise, the provided config will be merged with the inherited
-   * {@link Pipes} instance by appending pipes to their respective keys, without mutating
+   * {@link Pipes} instance by prepending pipes to their respective keys, without mutating
    * the inherited {@link Pipes}.
    *
-   * The following example shows how to append a new {@link PipeFactory} to the
-   * existing list of `async` factories, which will only be applied to the injector
+   * The following example shows how to extend an existing list of `async` factories
+   * with a new {@link PipeFactory}, which will only be applied to the injector
    * for this component and its children. This step is all that's required to make a new
    * pipe available to this component's template.
    *
@@ -59,43 +60,39 @@ class Pipes {
    *
    * ```
    * @Component({
-   *   viewInjector: [
-   *     Pipes.append({
+   *   viewBindings: [
+   *     Pipes.extend({
    *       async: [newAsyncPipe]
    *     })
    *   ]
    * })
    * ```
    */
-  static Binding append(config) {
+  static Binding extend(Map<String, List<PipeFactory>> config) {
     return new Binding(Pipes, toFactory: (Pipes pipes) {
-      if (!isPresent(pipes)) {
-        // Typically would occur when calling Pipe.append inside of dependencies passed to
+      if (isBlank(pipes)) {
+        // Typically would occur when calling Pipe.extend inside of dependencies passed to
 
-        // bootstrap(), which would override default pipes instead of append.
+        // bootstrap(), which would override default pipes instead of extending them.
         throw new BaseException(
-            "Cannot append to Pipes without a parent injector");
+            "Cannot extend Pipes without a parent injector");
       }
-      Map<String, List<PipeFactory>> mergedConfig = ({
-      } as Map<String, List<PipeFactory>>);
-      // Manual deep copy of existing Pipes config,
-
-      // so that lists of PipeFactories don't get mutated.
+      return Pipes.create(config, pipes);
+    }, deps: [[Pipes, new SkipSelfMetadata(), new OptionalMetadata()]]);
+  }
+  static Pipes create(Map<String, List<PipeFactory>> config,
+      [Pipes pipes = null]) {
+    if (isPresent(pipes)) {
       StringMapWrapper.forEach(pipes.config, (List<PipeFactory> v, String k) {
-        List<PipeFactory> localPipeList = mergedConfig[k] = [];
-        v.forEach((PipeFactory p) {
-          localPipeList.add(p);
-        });
-      });
-      StringMapWrapper.forEach(config, (List<PipeFactory> v, String k) {
-        if (isListLikeIterable(mergedConfig[k])) {
-          mergedConfig[k] = ListWrapper.concat(mergedConfig[k], config[k]);
+        if (StringMapWrapper.contains(config, k)) {
+          List<PipeFactory> configFactories = config[k];
+          config[k] = new List.from(configFactories)..addAll(v);
         } else {
-          mergedConfig[k] = config[k];
+          config[k] = ListWrapper.clone(v);
         }
       });
-      return new Pipes(mergedConfig);
-    }, deps: [[Pipes, new UnboundedMetadata(), new OptionalMetadata()]]);
+    }
+    return new Pipes(config);
   }
   List<PipeFactory> _getListOfFactories(String type, dynamic obj) {
     var listOfFactories = this.config[type];

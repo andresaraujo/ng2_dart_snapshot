@@ -16,7 +16,7 @@ class EventManager {
       _plugins[i].manager = this;
     }
   }
-  addEventListener(element, String eventName, Function handler) {
+  addEventListener(dynamic element, String eventName, Function handler) {
     var withoutBubbleSymbol = this._removeBubbleSymbol(eventName);
     var plugin = this._findPluginFor(withoutBubbleSymbol);
     plugin.addEventListener(element, withoutBubbleSymbol, handler,
@@ -61,12 +61,12 @@ class EventManagerPlugin {
   bool supports(String eventName) {
     return false;
   }
-  addEventListener(
-      element, String eventName, Function handler, bool shouldSupportBubble) {
+  addEventListener(dynamic element, String eventName, Function handler,
+      bool shouldSupportBubble) {
     throw "not implemented";
   }
-  Function addGlobalEventListener(
-      element, String eventName, Function handler, bool shouldSupportBubble) {
+  Function addGlobalEventListener(String element, String eventName,
+      Function handler, bool shouldSupportBubble) {
     throw "not implemented";
   }
 }
@@ -78,8 +78,8 @@ class DomEventsPlugin extends EventManagerPlugin {
   bool supports(String eventName) {
     return true;
   }
-  addEventListener(
-      element, String eventName, Function handler, bool shouldSupportBubble) {
+  addEventListener(dynamic element, String eventName, Function handler,
+      bool shouldSupportBubble) {
     var outsideHandler = this._getOutsideHandler(
         shouldSupportBubble, element, handler, this.manager._zone);
     this.manager._zone.runOutsideAngular(() {
@@ -95,14 +95,14 @@ class DomEventsPlugin extends EventManagerPlugin {
       return DOM.onAndCancel(element, eventName, outsideHandler);
     });
   }
-  _getOutsideHandler(
-      bool shouldSupportBubble, element, Function handler, NgZone zone) {
+  _getOutsideHandler(bool shouldSupportBubble, dynamic element,
+      Function handler, NgZone zone) {
     return shouldSupportBubble
         ? DomEventsPlugin.bubbleCallback(element, handler, zone)
         : DomEventsPlugin.sameElementCallback(element, handler, zone);
   }
   static dynamic /* (event: Event) => void */ sameElementCallback(
-      element, handler, zone) {
+      dynamic element, Function handler, NgZone zone) {
     return (event) {
       if (identical(event.target, element)) {
         zone.run(() => handler(event));
@@ -110,7 +110,7 @@ class DomEventsPlugin extends EventManagerPlugin {
     };
   }
   static dynamic /* (event: Event) => void */ bubbleCallback(
-      element, handler, zone) {
+      dynamic element, Function handler, NgZone zone) {
     return (event) => zone.run(() => handler(event));
   }
 }

@@ -11,8 +11,21 @@ export "types.dart" show SetterFn, GetterFn, MethodFn;
 export "platform_reflection_capabilities.dart"
     show PlatformReflectionCapabilities;
 
+class ReflectionInfo {
+  Function _factory;
+  List<dynamic> _annotations;
+  List<List<dynamic>> _parameters;
+  List<dynamic> _interfaces;
+  ReflectionInfo([List<dynamic> annotations, List<List<dynamic>> parameters,
+      Function factory, List<dynamic> interfaces]) {
+    this._annotations = annotations;
+    this._parameters = parameters;
+    this._factory = factory;
+    this._interfaces = interfaces;
+  }
+}
 class Reflector {
-  Map<dynamic, Map<String, dynamic>> _injectableInfo;
+  Map<dynamic, ReflectionInfo> _injectableInfo;
   Map<String, GetterFn> _getters;
   Map<String, SetterFn> _setters;
   Map<String, MethodFn> _methods;
@@ -27,10 +40,10 @@ class Reflector {
   bool isReflectionEnabled() {
     return this.reflectionCapabilities.isReflectionEnabled();
   }
-  void registerFunction(Function func, Map<String, dynamic> funcInfo) {
+  void registerFunction(Function func, ReflectionInfo funcInfo) {
     this._injectableInfo[func] = funcInfo;
   }
-  void registerType(Type type, Map<String, dynamic> typeInfo) {
+  void registerType(Type type, ReflectionInfo typeInfo) {
     this._injectableInfo[type] = typeInfo;
   }
   void registerGetters(Map<String, GetterFn> getters) {
@@ -43,29 +56,33 @@ class Reflector {
     _mergeMaps(this._methods, methods);
   }
   Function factory(Type type) {
-    if (this._containsTypeInfo(type)) {
-      return this._getTypeInfoField(type, "factory", null);
+    if (this._containsReflectionInfo(type)) {
+      var res = this._injectableInfo[type]._factory;
+      return isPresent(res) ? res : null;
     } else {
       return this.reflectionCapabilities.factory(type);
     }
   }
-  List<dynamic> parameters(typeOrFunc) {
+  List<dynamic> parameters(dynamic typeOrFunc) {
     if (this._injectableInfo.containsKey(typeOrFunc)) {
-      return this._getTypeInfoField(typeOrFunc, "parameters", []);
+      var res = this._injectableInfo[typeOrFunc]._parameters;
+      return isPresent(res) ? res : [];
     } else {
       return this.reflectionCapabilities.parameters(typeOrFunc);
     }
   }
-  List<dynamic> annotations(typeOrFunc) {
+  List<dynamic> annotations(dynamic typeOrFunc) {
     if (this._injectableInfo.containsKey(typeOrFunc)) {
-      return this._getTypeInfoField(typeOrFunc, "annotations", []);
+      var res = this._injectableInfo[typeOrFunc]._annotations;
+      return isPresent(res) ? res : [];
     } else {
       return this.reflectionCapabilities.annotations(typeOrFunc);
     }
   }
-  List<dynamic> interfaces(type) {
+  List<dynamic> interfaces(Type type) {
     if (this._injectableInfo.containsKey(type)) {
-      return this._getTypeInfoField(type, "interfaces", []);
+      var res = this._injectableInfo[type]._interfaces;
+      return isPresent(res) ? res : [];
     } else {
       return this.reflectionCapabilities.interfaces(type);
     }
@@ -91,11 +108,7 @@ class Reflector {
       return this.reflectionCapabilities.method(name);
     }
   }
-  _getTypeInfoField(typeOrFunc, key, defaultValue) {
-    var res = this._injectableInfo[typeOrFunc][key];
-    return isPresent(res) ? res : defaultValue;
-  }
-  _containsTypeInfo(typeOrFunc) {
+  _containsReflectionInfo(typeOrFunc) {
     return this._injectableInfo.containsKey(typeOrFunc);
   }
 }

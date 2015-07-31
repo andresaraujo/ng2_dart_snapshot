@@ -4,6 +4,9 @@ library angular2.test.di.integration_dart_spec;
 import 'package:angular2/angular2.dart';
 import 'package:angular2/di.dart';
 import 'package:angular2/test_lib.dart';
+import 'package:observe/observe.dart';
+import 'package:angular2/src/directives/observable_list_diff.dart';
+import 'package:angular2/src/change_detection/pipes/iterable_changes.dart';
 
 class MockException implements Error {
   var message;
@@ -38,7 +41,7 @@ void functionThatThrowsNonError() {
 
 main() {
   describe('TypeLiteral', () {
-    it('should publish via viewInjector', inject([
+    it('should publish via viewBindings', inject([
       TestComponentBuilder,
       AsyncTestCompleter
     ], (tb, async) {
@@ -67,8 +70,8 @@ main() {
               directives: [ThrowingComponent]))
           .createAsync(Dummy)
           .catchError((e, stack) {
-        expect(e.message).toContain("MockException");
-        expect(e.message).toContain("functionThatThrows");
+        expect(e).toContainError("MockException");
+        expect(e).toContainError("functionThatThrows");
         async.done();
       });
     }));
@@ -83,8 +86,8 @@ main() {
               directives: [ThrowingComponent2]))
           .createAsync(Dummy)
           .catchError((e, stack) {
-        expect(e.message).toContain("NonError");
-        expect(e.message).toContain("functionThatThrows");
+        expect(e).toContainError("NonError");
+        expect(e).toContainError("functionThatThrows");
         async.done();
       });
     }));
@@ -144,14 +147,60 @@ main() {
       });
     }));
   });
+
+  describe("ObservableListDiff", () {
+    it('should be notified of changes', inject([
+      TestComponentBuilder,
+      Log
+    ], fakeAsync((TestComponentBuilder tcb, Log log) {
+      tcb
+          .overrideView(Dummy, new View(
+              template: '''<component-with-observable-list [list]="value"></component-with-observable-list>''',
+              directives: [ComponentWithObservableList]))
+          .createAsync(Dummy)
+          .then((tc) {
+        tc.componentInstance.value = new ObservableList.from([1, 2]);
+
+        tc.detectChanges();
+
+        expect(log.result()).toEqual("check");
+        expect(asNativeElements(tc.componentViewChildren)).toHaveText('12');
+
+        tc.detectChanges();
+
+        // we did not change the list => no checks
+        expect(log.result()).toEqual("check");
+
+        tc.componentInstance.value.add(3);
+
+        flushMicrotasks();
+
+        tc.detectChanges();
+
+        // we changed the list => a check
+        expect(log.result()).toEqual("check; check");
+        expect(asNativeElements(tc.componentViewChildren)).toHaveText('123');
+
+        // we replaced the list => a check
+        tc.componentInstance.value = new ObservableList.from([5, 6, 7]);
+
+        tc.detectChanges();
+
+        expect(log.result()).toEqual("check; check; check");
+        expect(asNativeElements(tc.componentViewChildren)).toHaveText('567');
+      });
+    })));
+  });
 }
 
 @Component(selector: 'dummy')
-class Dummy {}
+class Dummy {
+  dynamic value;
+}
 
 @Component(
     selector: 'type-literal-component',
-    viewInjector: const [
+    viewBindings: const [
   const Binding(const TypeLiteral<List<String>>(),
       toValue: const <String>['Hello', 'World'])
 ])
@@ -178,7 +227,7 @@ class ThrowingComponent2 {
   }
 }
 
-@proxy
+@proxy()
 class PropModel implements Map {
   final String foo = 'foo-prop';
 
@@ -213,4 +262,36 @@ class OnChangeComponent implements OnChange {
   void onChange(Map changes) {
     this.changes = changes;
   }
+}
+
+@Component(
+    selector: 'component-with-observable-list',
+    changeDetection: ON_PUSH,
+    properties: const ['list'],
+    bindings: const [
+  const Binding(Pipes,
+      toValue: const Pipes(const {
+    "iterableDiff": const [
+      const ObservableListDiffFactory(),
+      const IterableChangesFactory(),
+      const NullPipeFactory()
+    ]
+  }))
+])
+@View(
+    template: '<span *ng-for="#item of list">{{item}}</span><directive-logging-checks></directive-logging-checks>',
+    directives: const [NgFor, DirectiveLoggingChecks])
+class ComponentWithObservableList {
+  Iterable list;
+}
+
+@Directive(
+    selector: 'directive-logging-checks',
+    lifecycle: const [LifecycleEvent.onCheck])
+class DirectiveLoggingChecks implements OnCheck {
+  Log log;
+
+  DirectiveLoggingChecks(this.log);
+
+  onCheck() => log.add("check");
 }

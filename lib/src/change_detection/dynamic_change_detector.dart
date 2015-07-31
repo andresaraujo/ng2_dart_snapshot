@@ -4,60 +4,44 @@ import "package:angular2/src/facade/lang.dart"
     show isPresent, isBlank, BaseException, FunctionWrapper;
 import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, MapWrapper, StringMapWrapper;
-import "package:angular2/src/change_detection/parser/locals.dart" show Locals;
 import "abstract_change_detector.dart" show AbstractChangeDetector;
 import "binding_record.dart" show BindingRecord;
-import "pipes/pipes.dart" show Pipes;
-import "change_detection_util.dart"
-    show ChangeDetectionUtil, SimpleChange, uninitialized;
+import "change_detection_util.dart" show ChangeDetectionUtil, SimpleChange;
 import "proto_record.dart" show ProtoRecord, RecordType;
 
-class DynamicChangeDetector extends AbstractChangeDetector {
-  String changeControlStrategy;
-  dynamic dispatcher;
-  List<ProtoRecord> protos;
-  List<dynamic> directiveRecords;
-  Locals locals = null;
+class DynamicChangeDetector extends AbstractChangeDetector<dynamic> {
   List<dynamic> values;
   List<dynamic> changes;
   List<dynamic> localPipes;
   List<dynamic> prevContexts;
   dynamic directives = null;
-  bool alreadyChecked = false;
-  Pipes pipes = null;
-  DynamicChangeDetector(String id, this.changeControlStrategy, this.dispatcher,
-      this.protos, this.directiveRecords)
-      : super(id) {
+  DynamicChangeDetector(String id, String changeDetectionStrategy,
+      dynamic dispatcher, List<ProtoRecord> protos,
+      List<dynamic> directiveRecords)
+      : super(id, dispatcher, protos, directiveRecords,
+          ChangeDetectionUtil.changeDetectionMode(changeDetectionStrategy)) {
     /* super call moved to initializer */;
-    this.values = ListWrapper.createFixedSize(protos.length + 1);
-    this.localPipes = ListWrapper.createFixedSize(protos.length + 1);
-    this.prevContexts = ListWrapper.createFixedSize(protos.length + 1);
-    this.changes = ListWrapper.createFixedSize(protos.length + 1);
-    this.values[0] = null;
-    ListWrapper.fill(this.values, uninitialized, 1);
-    ListWrapper.fill(this.localPipes, null);
-    ListWrapper.fill(this.prevContexts, uninitialized);
-    ListWrapper.fill(this.changes, false);
+    var len = protos.length + 1;
+    this.values = ListWrapper.createFixedSize(len);
+    this.localPipes = ListWrapper.createFixedSize(len);
+    this.prevContexts = ListWrapper.createFixedSize(len);
+    this.changes = ListWrapper.createFixedSize(len);
+    this.dehydrateDirectives(false);
   }
-  void hydrate(
-      dynamic context, Locals locals, dynamic directives, Pipes pipes) {
-    this.mode =
-        ChangeDetectionUtil.changeDetectionMode(this.changeControlStrategy);
-    this.values[0] = context;
-    this.locals = locals;
+  void hydrateDirectives(dynamic directives) {
+    this.values[0] = this.context;
     this.directives = directives;
-    this.alreadyChecked = false;
-    this.pipes = pipes;
   }
-  dehydrate() {
-    this._destroyPipes();
+  dehydrateDirectives(bool destroyPipes) {
+    if (destroyPipes) {
+      this._destroyPipes();
+    }
     this.values[0] = null;
-    ListWrapper.fill(this.values, uninitialized, 1);
+    this.directives = null;
+    ListWrapper.fill(this.values, ChangeDetectionUtil.uninitialized, 1);
     ListWrapper.fill(this.changes, false);
     ListWrapper.fill(this.localPipes, null);
-    ListWrapper.fill(this.prevContexts, uninitialized);
-    this.locals = null;
-    this.pipes = null;
+    ListWrapper.fill(this.prevContexts, ChangeDetectionUtil.uninitialized);
   }
   _destroyPipes() {
     for (var i = 0; i < this.localPipes.length; ++i) {
@@ -66,20 +50,20 @@ class DynamicChangeDetector extends AbstractChangeDetector {
       }
     }
   }
-  bool hydrated() {
-    return !identical(this.values[0], null);
+  void checkNoChanges() {
+    this.runDetectChanges(true);
   }
-  detectChangesInRecords(bool throwOnChange) {
-    if (!this.hydrated()) {
-      ChangeDetectionUtil.throwDehydrated();
-    }
-    List<ProtoRecord> protos = this.protos;
+  detectChangesInRecordsInternal(bool throwOnChange) {
+    var protos = this.protos;
     var changes = null;
     var isChanged = false;
     for (var i = 0; i < protos.length; ++i) {
       ProtoRecord proto = protos[i];
       var bindingRecord = proto.bindingRecord;
       var directiveRecord = bindingRecord.directiveRecord;
+      if (this._firstInBinding(proto)) {
+        this.firstProtoInCurrentBinding = proto.selfIndex;
+      }
       if (proto.isLifeCycleRecord()) {
         if (identical(proto.name, "onCheck") && !throwOnChange) {
           this._getDirectiveFor(directiveRecord.directiveIndex).onCheck();
@@ -114,8 +98,12 @@ class DynamicChangeDetector extends AbstractChangeDetector {
     }
     this.alreadyChecked = true;
   }
+  bool _firstInBinding(ProtoRecord r) {
+    var prev = ChangeDetectionUtil.protoByIndex(this.protos, r.selfIndex - 1);
+    return isBlank(prev) || !identical(prev.bindingRecord, r.bindingRecord);
+  }
   callOnAllChangesDone() {
-    this.dispatcher.notifyOnAllChangesDone();
+    super.callOnAllChangesDone();
     var dirs = this.directiveRecords;
     for (var i = dirs.length - 1; i >= 0; --i) {
       var dir = dirs[i];
@@ -135,8 +123,8 @@ class DynamicChangeDetector extends AbstractChangeDetector {
   }
   _addChange(BindingRecord bindingRecord, change, changes) {
     if (bindingRecord.callOnChange()) {
-      return ChangeDetectionUtil.addChange(
-          changes, bindingRecord.propertyName, change);
+      return super.addChange(
+          changes, change.previousValue, change.currentValue);
     } else {
       return changes;
     }
@@ -148,14 +136,10 @@ class DynamicChangeDetector extends AbstractChangeDetector {
     return this.directives.getDetectorFor(directiveIndex);
   }
   SimpleChange _check(ProtoRecord proto, bool throwOnChange) {
-    try {
-      if (proto.isPipeRecord()) {
-        return this._pipeCheck(proto, throwOnChange);
-      } else {
-        return this._referenceCheck(proto, throwOnChange);
-      }
-    } catch (e, e_stack) {
-      this.throwError(proto, e, e_stack);
+    if (proto.isPipeRecord()) {
+      return this._pipeCheck(proto, throwOnChange);
+    } else {
+      return this._referenceCheck(proto, throwOnChange);
     }
   }
   _referenceCheck(ProtoRecord proto, bool throwOnChange) {
@@ -163,22 +147,28 @@ class DynamicChangeDetector extends AbstractChangeDetector {
       this._setChanged(proto, false);
       return null;
     }
-    var prevValue = this._readSelf(proto);
     var currValue = this._calculateCurrValue(proto);
-    if (!isSame(prevValue, currValue)) {
-      if (proto.lastInBinding) {
-        var change = ChangeDetectionUtil.simpleChange(prevValue, currValue);
-        if (throwOnChange) ChangeDetectionUtil.throwOnChange(proto, change);
-        this._writeSelf(proto, currValue);
-        this._setChanged(proto, true);
-        return change;
+    if (proto.shouldBeChecked()) {
+      var prevValue = this._readSelf(proto);
+      if (!isSame(prevValue, currValue)) {
+        if (proto.lastInBinding) {
+          var change = ChangeDetectionUtil.simpleChange(prevValue, currValue);
+          if (throwOnChange) this.throwOnChangeError(prevValue, currValue);
+          this._writeSelf(proto, currValue);
+          this._setChanged(proto, true);
+          return change;
+        } else {
+          this._writeSelf(proto, currValue);
+          this._setChanged(proto, true);
+          return null;
+        }
       } else {
-        this._writeSelf(proto, currValue);
-        this._setChanged(proto, true);
+        this._setChanged(proto, false);
         return null;
       }
     } else {
-      this._setChanged(proto, false);
+      this._writeSelf(proto, currValue);
+      this._setChanged(proto, true);
       return null;
     }
   }
@@ -215,6 +205,7 @@ class DynamicChangeDetector extends AbstractChangeDetector {
             this._readContext(proto), this._readArgs(proto));
       case RecordType.INTERPOLATE:
       case RecordType.PRIMITIVE_OP:
+      case RecordType.COLLECTION_LITERAL:
         return FunctionWrapper.apply(proto.funcOrValue, this._readArgs(proto));
       default:
         throw new BaseException('''Unknown operation ${ proto . mode}''');
@@ -224,23 +215,29 @@ class DynamicChangeDetector extends AbstractChangeDetector {
     var context = this._readContext(proto);
     var args = this._readArgs(proto);
     var pipe = this._pipeFor(proto, context);
-    var prevValue = this._readSelf(proto);
     var currValue = pipe.transform(context, args);
-    if (!isSame(prevValue, currValue)) {
-      currValue = ChangeDetectionUtil.unwrapValue(currValue);
-      if (proto.lastInBinding) {
-        var change = ChangeDetectionUtil.simpleChange(prevValue, currValue);
-        if (throwOnChange) ChangeDetectionUtil.throwOnChange(proto, change);
-        this._writeSelf(proto, currValue);
-        this._setChanged(proto, true);
-        return change;
+    if (proto.shouldBeChecked()) {
+      var prevValue = this._readSelf(proto);
+      if (!isSame(prevValue, currValue)) {
+        currValue = ChangeDetectionUtil.unwrapValue(currValue);
+        if (proto.lastInBinding) {
+          var change = ChangeDetectionUtil.simpleChange(prevValue, currValue);
+          if (throwOnChange) this.throwOnChangeError(prevValue, currValue);
+          this._writeSelf(proto, currValue);
+          this._setChanged(proto, true);
+          return change;
+        } else {
+          this._writeSelf(proto, currValue);
+          this._setChanged(proto, true);
+          return null;
+        }
       } else {
-        this._writeSelf(proto, currValue);
-        this._setChanged(proto, true);
+        this._setChanged(proto, false);
         return null;
       }
     } else {
-      this._setChanged(proto, false);
+      this._writeSelf(proto, currValue);
+      this._setChanged(proto, true);
       return null;
     }
   }
@@ -277,7 +274,7 @@ class DynamicChangeDetector extends AbstractChangeDetector {
     this.localPipes[proto.selfIndex] = value;
   }
   _setChanged(ProtoRecord proto, bool value) {
-    this.changes[proto.selfIndex] = value;
+    if (proto.argumentToPureFunction) this.changes[proto.selfIndex] = value;
   }
   bool _pureFuncAndArgsDidNotChange(ProtoRecord proto) {
     return proto.isPureFunction() && !this._argsChanged(proto);

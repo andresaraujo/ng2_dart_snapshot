@@ -85,7 +85,7 @@ class MockConnection implements Connection {
    * returned
    * from {@link Http}.
    */
-  mockError([err]) {
+  mockError([Error err]) {
     // Matches XHR semantics
     this.readyState = ReadyStates.DONE;
     ObservableWrapper.callThrow(this.response, err);

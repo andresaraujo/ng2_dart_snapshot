@@ -7,11 +7,13 @@ import "constants.dart" show CHECK_ONCE, DETACHED, CHECK_ALWAYS;
  * Controls change detection.
  *
  * {@link ChangeDetectorRef} allows requesting checks for detectors that rely on observables. It
- *also allows detaching and
- * attaching change detector subtrees.
+ * also allows detaching and attaching change detector subtrees.
  */
 class ChangeDetectorRef {
   ChangeDetector _cd;
+  /**
+   * @private
+   */
   ChangeDetectorRef(this._cd) {}
   /**
    * Request to check all ON_PUSH ancestors.

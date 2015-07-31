@@ -11,7 +11,7 @@ import "package:angular2/test_lib.dart"
         beforeEach,
         afterEach,
         SpyProtoChangeDetector;
-import "package:angular2/change_detection.dart"
+import "package:angular2/src/change_detection/change_detection.dart"
     show
         PreGeneratedChangeDetection,
         ChangeDetectorDefinition,
@@ -23,7 +23,7 @@ main() {
     var def;
     beforeEach(() {
       proto = new SpyProtoChangeDetector();
-      def = new ChangeDetectorDefinition("id", null, [], [], []);
+      def = new ChangeDetectorDefinition("id", null, [], [], [], true);
     });
     it("should return a proto change detector when one is available", () {
       var map = {"id": (def) => proto};

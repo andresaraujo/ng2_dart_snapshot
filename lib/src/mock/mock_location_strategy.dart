@@ -15,7 +15,7 @@ class MockLocationStrategy extends LocationStrategy {
   MockLocationStrategy() : super() {
     /* super call moved to initializer */;
   }
-  void simulatePopState(url) {
+  void simulatePopState(String url) {
     this.internalPath = url;
     ObservableWrapper.callNext(this._subject, null);
   }
@@ -30,7 +30,7 @@ class MockLocationStrategy extends LocationStrategy {
     this.internalPath = url;
     this.urlChanges.add(url);
   }
-  void onPopState(fn) {
+  void onPopState(dynamic /* (value: any) => void */ fn) {
     ObservableWrapper.subscribe(this._subject, fn);
   }
   String getBaseHref() {

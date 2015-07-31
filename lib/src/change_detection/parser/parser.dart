@@ -444,7 +444,7 @@ class _ParseAST {
     }
     return new LiteralMap(keys, values);
   }
-  AST parseAccessMemberOrMethodCall(receiver, [bool isSafe = false]) {
+  AST parseAccessMemberOrMethodCall(AST receiver, [bool isSafe = false]) {
     var id = this.expectIdentifierOrKeyword();
     if (this.optionalCharacter($LPAREN)) {
       var args = this.parseCallArguments();

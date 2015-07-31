@@ -36,7 +36,7 @@ class ObservablePipe implements Pipe {
   Object _subscription = null;
   Stream _observable = null;
   ObservablePipe(this._ref) {}
-  bool supports(obs) {
+  bool supports(dynamic obs) {
     return ObservableWrapper.isObservable(obs);
   }
   void onDestroy() {
@@ -62,9 +62,8 @@ class ObservablePipe implements Pipe {
   }
   void _subscribe(Stream obs) {
     this._observable = obs;
-    this._subscription = ObservableWrapper.subscribe(obs, (value) {
-      this._updateLatestValue(value);
-    }, (e) {
+    this._subscription = ObservableWrapper.subscribe(obs,
+        (value) => this._updateLatestValue(value), (e) {
       throw e;
     });
   }
@@ -84,7 +83,7 @@ class ObservablePipe implements Pipe {
  * Provides a factory for [ObervablePipe].
  */
 class ObservablePipeFactory implements PipeFactory {
-  bool supports(obs) {
+  bool supports(dynamic obs) {
     return ObservableWrapper.isObservable(obs);
   }
   Pipe create(ChangeDetectorRef cdRef) {

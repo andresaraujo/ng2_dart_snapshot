@@ -6,7 +6,7 @@ import "package:angular2/src/facade/async.dart"
 import "package:angular2/src/facade/collection.dart" show List, ListWrapper;
 import "package:angular2/src/router/location.dart" show Location;
 
-@proxy
+@proxy()
 class SpyLocation extends SpyObject implements Location {
   List<String> urlChanges;
   String _path;
@@ -31,7 +31,7 @@ class SpyLocation extends SpyObject implements Location {
   simulateUrlPop(String pathname) {
     ObservableWrapper.callNext(this._subject, {"url": pathname});
   }
-  String normalizeAbsolutely(url) {
+  String normalizeAbsolutely(String url) {
     return this._baseHref + url;
   }
   go(String url) {
@@ -44,10 +44,12 @@ class SpyLocation extends SpyObject implements Location {
   }
   forward() {}
   back() {}
-  subscribe(onNext, [onThrow = null, onReturn = null]) {
+  subscribe(dynamic /* (value: any) => void */ onNext,
+      [dynamic /* (error: any) => void */ onThrow = null,
+      dynamic /* () => void */ onReturn = null]) {
     ObservableWrapper.subscribe(this._subject, onNext, onThrow, onReturn);
   }
-  noSuchMethod(m) {
+  noSuchMethod(dynamic m) {
     super.noSuchMethod(m);
   }
 }

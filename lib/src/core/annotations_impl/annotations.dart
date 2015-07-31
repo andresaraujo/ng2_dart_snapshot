@@ -54,13 +54,9 @@ import "package:angular2/change_detection.dart" show DEFAULT;
  *
  * To inject other directives, declare the constructor parameter as:
  * - `directive:DirectiveType`: a directive on the current element only
- * - `@Ancestor() directive:DirectiveType`: any directive that matches the type between the current
+ * - `@Host() directive:DirectiveType`: any directive that matches the type between the current
  * element and the
- *    Shadow DOM root. Current element is not included in the resolution, therefore even if it could
- * resolve it, it will
- *    be ignored.
- * - `@Parent() directive:DirectiveType`: any directive that matches the type on a direct parent
- * element only.
+ *    Shadow DOM root.
  * - `@Query(DirectiveType) query:QueryList<DirectiveType>`: A live collection of direct child
  * directives.
  * - `@QueryDescendants(DirectiveType) query:QueryList<DirectiveType>`: A live collection of any
@@ -164,46 +160,23 @@ import "package:angular2/change_detection.dart" show DEFAULT;
  * This directive would be instantiated with `Dependency` declared at the same element, in this case
  * `dependency="3"`.
  *
- *
- * ### Injecting a directive from a direct parent element
- *
- * Directives can inject other directives declared on a direct parent element. By definition, a
- * directive with a
- * `@Parent` annotation does not attempt to resolve dependencies for the current element, even if
- * this would satisfy
- * the dependency.
- *
- * ```
- * @Directive({ selector: '[my-directive]' })
- * class MyDirective {
- *   constructor(@Parent() dependency: Dependency) {
- *     expect(dependency.id).toEqual(2);
- *   }
- * }
- * ```
- * This directive would be instantiated with `Dependency` declared at the parent element, in this
- * case `dependency="2"`.
- *
- *
  * ### Injecting a directive from any ancestor elements
  *
  * Directives can inject other directives declared on any ancestor element (in the current Shadow
- * DOM), i.e. on the
- * parent element and its parents. By definition, a directive with an `@Ancestor` annotation does
- * not attempt to
- * resolve dependencies for the current element, even if this would satisfy the dependency.
- *
+ * DOM), i.e. on the current element, the
+ * parent element, or its parents.
  * ```
  * @Directive({ selector: '[my-directive]' })
  * class MyDirective {
- *   constructor(@Ancestor() dependency: Dependency) {
+ *   constructor(@Host() dependency: Dependency) {
  *     expect(dependency.id).toEqual(2);
  *   }
  * }
  * ```
  *
- * Unlike the `@Parent` which only checks the parent, `@Ancestor` checks the parent, as well as its
- * parents recursively. If `dependency="2"` didn't exist on the direct parent, this injection would
+ * `@Host` checks the current element, the parent, as well as its parents recursively. If
+ * `dependency="2"` didn't
+ * exist on the direct parent, this injection would
  * have returned
  * `dependency="1"`.
  *
@@ -361,12 +334,12 @@ import "package:angular2/change_detection.dart" show DEFAULT;
  * })
  * export class Unless {
  *   viewContainer: ViewContainerRef;
- *   protoViewRef: ProtoViewRef;
+ *   templateRef: TemplateRef;
  *   prevCondition: boolean;
  *
- *   constructor(viewContainer: ViewContainerRef, protoViewRef: ProtoViewRef) {
+ *   constructor(viewContainer: ViewContainerRef, templateRef: TemplateRef) {
  *     this.viewContainer = viewContainer;
- *     this.protoViewRef = protoViewRef;
+ *     this.templateRef = templateRef;
  *     this.prevCondition = null;
  *   }
  *
@@ -376,7 +349,7 @@ import "package:angular2/change_detection.dart" show DEFAULT;
  *       this.viewContainer.clear();
  *     } else if (!newCondition && (isBlank(this.prevCondition) || this.prevCondition)) {
  *       this.prevCondition = false;
- *       this.viewContainer.create(this.protoViewRef);
+ *       this.viewContainer.create(this.templateRef);
  *     }
  *   }
  * }
@@ -732,7 +705,7 @@ class Directive extends InjectableMetadata {
    *
    * @Directive({
    *   selector: 'greet',
-   *   hostInjector: [
+   *   bindings: [
    *     Greeter
    *   ]
    * })
@@ -745,7 +718,7 @@ class Directive extends InjectableMetadata {
    * }
    * ```
    */
-  final List<dynamic> hostInjector;
+  final List<dynamic> bindings;
   /**
    * Defines the name that can be used in the template to assign this directive to a variable.
    *
@@ -772,7 +745,7 @@ class Directive extends InjectableMetadata {
    * ```
    */
   final String exportAs;
-  const Directive({selector, properties, events, host, lifecycle, hostInjector,
+  const Directive({selector, properties, events, host, lifecycle, bindings,
       exportAs, compileChildren: true})
       : selector = selector,
         properties = properties,
@@ -781,7 +754,7 @@ class Directive extends InjectableMetadata {
         exportAs = exportAs,
         lifecycle = lifecycle,
         compileChildren = compileChildren,
-        hostInjector = hostInjector,
+        bindings = bindings,
         super();
 }
 /**
@@ -795,7 +768,7 @@ class Directive extends InjectableMetadata {
  * When a component is instantiated, Angular
  * - creates a shadow DOM for the component.
  * - loads the selected template into the shadow DOM.
- * - creates all the injectable objects configured with `hostInjector` and `viewInjector`.
+ * - creates all the injectable objects configured with `bindings` and `viewBindings`.
  *
  * All template expressions and statements are then evaluated against the component instance.
  *
@@ -860,7 +833,7 @@ class Component extends Directive {
    *
    * @Component({
    *   selector: 'greet',
-   *   viewInjector: [
+   *   viewBindings: [
    *     Greeter
    *   ]
    * })
@@ -873,19 +846,18 @@ class Component extends Directive {
    *
    * ```
    */
-  final List<dynamic> viewInjector;
+  final List<dynamic> viewBindings;
   const Component({selector, properties, events, host, exportAs, lifecycle,
-      hostInjector, viewInjector, changeDetection: DEFAULT,
-      compileChildren: true})
+      bindings, viewBindings, changeDetection: DEFAULT, compileChildren: true})
       : changeDetection = changeDetection,
-        viewInjector = viewInjector,
+        viewBindings = viewBindings,
         super(
             selector: selector,
             properties: properties,
             events: events,
             host: host,
             exportAs: exportAs,
-            hostInjector: hostInjector,
+            bindings: bindings,
             lifecycle: lifecycle,
             compileChildren: compileChildren);
 }

@@ -16,11 +16,12 @@ import '../common/read_file.dart';
 
 var formatter = new DartFormatter();
 
+main() => allTests();
+
 void allTests() {
   TestAssetReader reader = null;
 
   beforeEach(() {
-    setLogger(new PrintLogger());
     reader = new TestAssetReader();
   });
 
@@ -136,9 +137,9 @@ void allTests() {
         () async {
       var extracted = await extractDirectiveMetadata(reader, new AssetId(
           'a', 'directive_metadata_extractor/simple_files/foo.ng_deps.dart'));
-      expect(extracted).toContain('FooComponent');
+      expect(extracted.types).toContain('FooComponent');
 
-      var extractedMeta = extracted['FooComponent'];
+      var extractedMeta = extracted.types['FooComponent'];
       expect(extractedMeta.selector).toEqual('[foo]');
     });
 
@@ -147,33 +148,33 @@ void allTests() {
       var extracted = await extractDirectiveMetadata(reader, new AssetId('a',
           'directive_metadata_extractor/adjacent_strings_files/'
           'foo.ng_deps.dart'));
-      expect(extracted).toContain('FooComponent');
+      expect(extracted.types).toContain('FooComponent');
 
-      var extractedMeta = extracted['FooComponent'];
+      var extractedMeta = extracted.types['FooComponent'];
       expect(extractedMeta.selector).toEqual('[foo]');
     });
 
     it('should include `DirectiveMetadata` from exported files.', () async {
       var extracted = await extractDirectiveMetadata(reader, new AssetId(
           'a', 'directive_metadata_extractor/export_files/foo.ng_deps.dart'));
-      expect(extracted).toContain('FooComponent');
-      expect(extracted).toContain('BarComponent');
+      expect(extracted.types).toContain('FooComponent');
+      expect(extracted.types).toContain('BarComponent');
 
-      expect(extracted['FooComponent'].selector).toEqual('[foo]');
-      expect(extracted['BarComponent'].selector).toEqual('[bar]');
+      expect(extracted.types['FooComponent'].selector).toEqual('[foo]');
+      expect(extracted.types['BarComponent'].selector).toEqual('[bar]');
     });
 
     it('should include `DirectiveMetadata` recursively from exported files.',
         () async {
       var extracted = await extractDirectiveMetadata(reader, new AssetId('a',
           'directive_metadata_extractor/recursive_export_files/foo.ng_deps.dart'));
-      expect(extracted).toContain('FooComponent');
-      expect(extracted).toContain('BarComponent');
-      expect(extracted).toContain('BazComponent');
+      expect(extracted.types).toContain('FooComponent');
+      expect(extracted.types).toContain('BarComponent');
+      expect(extracted.types).toContain('BazComponent');
 
-      expect(extracted['FooComponent'].selector).toEqual('[foo]');
-      expect(extracted['BarComponent'].selector).toEqual('[bar]');
-      expect(extracted['BazComponent'].selector).toEqual('[baz]');
+      expect(extracted.types['FooComponent'].selector).toEqual('[foo]');
+      expect(extracted.types['BarComponent'].selector).toEqual('[bar]');
+      expect(extracted.types['BazComponent'].selector).toEqual('[baz]');
     });
 
     it('should include `DirectiveMetadata` from exported files '
@@ -183,11 +184,24 @@ void allTests() {
 
       var extracted = await extractDirectiveMetadata(reader, new AssetId('a',
           'directive_metadata_extractor/absolute_export_files/foo.ng_deps.dart'));
-      expect(extracted).toContain('FooComponent');
-      expect(extracted).toContain('BarComponent');
+      expect(extracted.types).toContain('FooComponent');
+      expect(extracted.types).toContain('BarComponent');
 
-      expect(extracted['FooComponent'].selector).toEqual('[foo]');
-      expect(extracted['BarComponent'].selector).toEqual('[bar]');
+      expect(extracted.types['FooComponent'].selector).toEqual('[foo]');
+      expect(extracted.types['BarComponent'].selector).toEqual('[bar]');
+    });
+
+    it('should include directive aliases', () async {
+      reader.addAsset(new AssetId('bar', 'lib/bar.ng_deps.dart'), readFile(
+          'directive_metadata_extractor/directive_aliases_files/bar.ng_deps.dart'));
+
+      var extracted = await extractDirectiveMetadata(reader, new AssetId('a',
+          'directive_metadata_extractor/directive_aliases_files/foo.ng_deps.dart'));
+      expect(extracted.aliases).toContain('alias1');
+      expect(extracted.aliases).toContain('alias2');
+      expect(extracted.aliases['alias1']).toContain('BarComponent');
+      expect(extracted.aliases['alias2']).toContain('FooComponent');
+      expect(extracted.aliases['alias2']).toContain('alias1');
     });
   });
 }

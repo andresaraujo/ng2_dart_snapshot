@@ -1,7 +1,7 @@
 library angular2.src.forms.directives.ng_control_group;
 
-import "package:angular2/angular2.dart" show Directive, LifecycleEvent;
-import "package:angular2/di.dart" show Inject, Ancestor, Binding;
+import "package:angular2/annotations.dart" show Directive, LifecycleEvent;
+import "package:angular2/di.dart" show Inject, Host, SkipSelf, Binding;
 import "package:angular2/src/facade/collection.dart" show List, ListWrapper;
 import "control_container.dart" show ControlContainer;
 import "shared.dart" show controlPath;
@@ -49,13 +49,13 @@ const controlGroupBinding =
  */
 @Directive(
     selector: "[ng-control-group]",
-    hostInjector: const [controlGroupBinding],
+    bindings: const [controlGroupBinding],
     properties: const ["name: ng-control-group"],
     lifecycle: const [LifecycleEvent.onInit, LifecycleEvent.onDestroy],
     exportAs: "form")
 class NgControlGroup extends ControlContainer {
   ControlContainer _parent;
-  NgControlGroup(@Ancestor() ControlContainer _parent) : super() {
+  NgControlGroup(@Host() @SkipSelf() ControlContainer _parent) : super() {
     /* super call moved to initializer */;
     this._parent = _parent;
   }

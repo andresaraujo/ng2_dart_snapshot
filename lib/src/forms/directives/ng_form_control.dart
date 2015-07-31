@@ -1,15 +1,15 @@
 library angular2.src.forms.directives.ng_form_control;
 
-import "package:angular2/src/facade/collection.dart" show StringMapWrapper;
 import "package:angular2/src/facade/async.dart"
     show EventEmitter, ObservableWrapper;
-import "package:angular2/angular2.dart"
-    show Directive, LifecycleEvent, Query, QueryList;
-import "package:angular2/di.dart" show Ancestor, Binding;
+import "package:angular2/core.dart" show QueryList;
+import "package:angular2/annotations.dart"
+    show Query, Directive, LifecycleEvent;
+import "package:angular2/di.dart" show Binding;
 import "ng_control.dart" show NgControl;
 import "../model.dart" show Control;
 import "validators.dart" show NgValidator;
-import "shared.dart" show setUpControl, composeNgValidator;
+import "shared.dart" show setUpControl, composeNgValidator, isPropertyUpdated;
 
 const formControlBinding = const Binding(NgControl, toAlias: NgFormControl);
 /**
@@ -59,7 +59,7 @@ const formControlBinding = const Binding(NgControl, toAlias: NgFormControl);
  */
 @Directive(
     selector: "[ng-form-control]",
-    hostInjector: const [formControlBinding],
+    bindings: const [formControlBinding],
     properties: const ["form: ngFormControl", "model: ngModel"],
     events: const ["update: ngModel"],
     lifecycle: const [LifecycleEvent.onChange],
@@ -69,6 +69,7 @@ class NgFormControl extends NgControl {
   var update = new EventEmitter();
   var _added = false;
   dynamic model;
+  dynamic viewModel;
   QueryList<NgValidator> ngValidators;
   // Scope the query once https://github.com/angular/angular/issues/2603 is fixed
   NgFormControl(@Query(NgValidator) QueryList<NgValidator> ngValidators)
@@ -76,13 +77,13 @@ class NgFormControl extends NgControl {
     /* super call moved to initializer */;
     this.ngValidators = ngValidators;
   }
-  onChange(c) {
+  onChange(Map<String, dynamic> c) {
     if (!this._added) {
       setUpControl(this.form, this);
       this.form.updateValidity();
       this._added = true;
     }
-    if (StringMapWrapper.contains(c, "model")) {
+    if (isPropertyUpdated(c, this.viewModel)) {
       this.form.updateValue(this.model);
     }
   }
@@ -96,6 +97,7 @@ class NgFormControl extends NgControl {
     return composeNgValidator(this.ngValidators);
   }
   void viewToModelUpdate(dynamic newValue) {
+    this.viewModel = newValue;
     ObservableWrapper.callNext(this.update, newValue);
   }
 }

@@ -8,7 +8,7 @@ import "pipe.dart" show WrappedValue, Pipe, BasePipe, PipeFactory;
 import "../change_detector_ref.dart" show ChangeDetectorRef;
 
 class IterableChangesFactory implements PipeFactory {
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return IterableChanges.supportsObj(obj);
   }
   Pipe create(ChangeDetectorRef cdRef) {
@@ -35,10 +35,10 @@ class IterableChanges extends BasePipe {
   IterableChanges() : super() {
     /* super call moved to initializer */;
   }
-  static bool supportsObj(obj) {
+  static bool supportsObj(Object obj) {
     return isListLikeIterable(obj);
   }
-  bool supports(obj) {
+  bool supports(Object obj) {
     return IterableChanges.supportsObj(obj);
   }
   get collection {
@@ -87,7 +87,7 @@ class IterableChanges extends BasePipe {
       fn(record);
     }
   }
-  dynamic transform(collection, [List<dynamic> args = null]) {
+  dynamic transform(dynamic collection, [List<dynamic> args = null]) {
     if (this.check(collection)) {
       return WrappedValue.wrap(this);
     } else {
@@ -95,7 +95,7 @@ class IterableChanges extends BasePipe {
     }
   }
   // todo(vicb): optim for UnmodifiableListView (frozen arrays)
-  bool check(collection) {
+  bool check(dynamic collection) {
     this._reset();
     CollectionChangeRecord record = this._itHead;
     bool mayBeDirty = false;
@@ -533,7 +533,7 @@ class _DuplicateItemRecordList {
   // Returns a CollectionChangeRecord having CollectionChangeRecord.item == item and
 
   // CollectionChangeRecord.currentIndex >= afterIndex
-  CollectionChangeRecord get(item, int afterIndex) {
+  CollectionChangeRecord get(dynamic item, int afterIndex) {
     CollectionChangeRecord record;
     for (record = this._head;
         !identical(record, null);
@@ -600,7 +600,7 @@ class _DuplicateMap {
    * Use case: `[a, b, c, a, a]` if we are at index `3` which is the second `a` then asking if we
    * have any more `a`s needs to return the last `a` not the first or second.
    */
-  CollectionChangeRecord get(value, [afterIndex = null]) {
+  CollectionChangeRecord get(dynamic value, [int afterIndex = null]) {
     var key = getMapKey(value);
     var recordList = this.map[key];
     return isBlank(recordList) ? null : recordList.get(value, afterIndex);

@@ -19,7 +19,8 @@ import "package:angular2/test_lib.dart"
 import "package:angular2/src/facade/async.dart"
     show TimerWrapper, PromiseWrapper;
 import "package:angular2/src/facade/lang.dart" show BaseException, global;
-import "package:angular2/change_detection.dart" show Parser;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show Parser;
 
 main() {
   describe("fake async", () {

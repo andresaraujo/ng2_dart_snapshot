@@ -11,6 +11,8 @@ setRootDomAdapter(DomAdapter adapter) {
 _abstract() {
   return new BaseException("This method is abstract");
 }
+/* tslint:disable:requireParameterType */
+
 /**
  * Provides DOM operations in an environment-agnostic way.
  */
@@ -30,6 +32,15 @@ class DomAdapter {
   logError(error) {
     throw _abstract();
   }
+  log(error) {
+    throw _abstract();
+  }
+  logGroup(error) {
+    throw _abstract();
+  }
+  logGroupEnd() {
+    throw _abstract();
+  }
   /**
    * Maps attribute names to their corresponding property names for cases
    * where attribute name doesn't match property name.
@@ -43,7 +54,7 @@ class DomAdapter {
   dynamic query(String selector) {
     throw _abstract();
   }
-  querySelector(el, String selector) {
+  dynamic querySelector(el, String selector) {
     throw _abstract();
   }
   List<dynamic> querySelectorAll(el, String selector) {
@@ -143,6 +154,9 @@ class DomAdapter {
     throw _abstract();
   }
   setChecked(el, bool value) {
+    throw _abstract();
+  }
+  dynamic createComment(String text) {
     throw _abstract();
   }
   dynamic createTemplate(html) {
@@ -259,7 +273,10 @@ class DomAdapter {
   bool isShadowRoot(node) {
     throw _abstract();
   }
-  importIntoDoc(node) {
+  dynamic importIntoDoc(dynamic node) {
+    throw _abstract();
+  }
+  dynamic adoptNode(dynamic node) {
     throw _abstract();
   }
   bool isPageRule(rule) {

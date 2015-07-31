@@ -5,7 +5,7 @@ import "pipe.dart" show Pipe, BasePipe, WrappedValue, PipeFactory;
 import "../change_detector_ref.dart" show ChangeDetectorRef;
 
 class NullPipeFactory implements PipeFactory {
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return NullPipe.supportsObj(obj);
   }
   Pipe create(ChangeDetectorRef cdRef) {
@@ -15,13 +15,13 @@ class NullPipeFactory implements PipeFactory {
 }
 class NullPipe extends BasePipe {
   bool called = false;
-  static bool supportsObj(obj) {
+  static bool supportsObj(dynamic obj) {
     return isBlank(obj);
   }
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return NullPipe.supportsObj(obj);
   }
-  WrappedValue transform(value, [List<dynamic> args = null]) {
+  WrappedValue transform(dynamic value, [List<dynamic> args = null]) {
     if (!this.called) {
       this.called = true;
       return WrappedValue.wrap(null);

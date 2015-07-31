@@ -1,20 +1,18 @@
 library examples.src.hello_world.split_url_expression_files.ng_deps.dart;
 
 import 'hello.dart';
+export 'hello.dart';
+import 'package:angular2/src/reflection/reflection.dart' as _ngRef;
 import 'package:angular2/angular2.dart'
-    show bootstrap, Component, Directive, View, NgElement;
+    show Component, Directive, View, NgElement;
 
 var _visited = false;
-void initReflector(reflector) {
+void initReflector() {
   if (_visited) return;
   _visited = true;
-  reflector
-    ..registerType(HelloCmp, {
-      'factory': () => new HelloCmp(),
-      'parameters': const [],
-      'annotations': const [
-        const Component(selector: 'hello-app'),
-        const View(template: r'''{{greeting}}''', templateUrl: r'template.html')
-      ]
-    });
+  _ngRef.reflector
+    ..registerType(HelloCmp, new _ngRef.ReflectionInfo(const [
+      const Component(selector: 'hello-app'),
+      const View(template: r'''{{greeting}}''', templateUrl: r'template.html')
+    ], const [], () => new HelloCmp()));
 }

@@ -8,6 +8,7 @@ import "compile_control.dart" as compileControlModule;
  * Is guaranteed to be called in depth first order
  */
 abstract class CompileStep {
-  void process(CompileElement parent, CompileElement current,
+  void processElement(CompileElement parent, CompileElement current,
       compileControlModule.CompileControl control);
+  String processStyle(String style);
 }

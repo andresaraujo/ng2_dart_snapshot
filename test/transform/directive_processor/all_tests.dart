@@ -1,10 +1,13 @@
 library angular2.test.transform.directive_processor.all_tests;
 
+import 'dart:convert';
+
 import 'package:barback/barback.dart';
 import 'package:angular2/src/transform/directive_processor/rewriter.dart';
 import 'package:angular2/src/transform/common/annotation_matcher.dart';
 import 'package:angular2/src/transform/common/asset_reader.dart';
 import 'package:angular2/src/transform/common/logging.dart' as log;
+import 'package:angular2/src/transform/common/ng_meta.dart';
 import 'package:code_transformers/messages/build_logger.dart';
 import 'package:dart_style/dart_style.dart';
 import 'package:guinness/guinness.dart';
@@ -18,29 +21,32 @@ main() {
 }
 
 void allTests() {
-  _testNgDeps('should preserve parameter annotations as const instances.',
+  _testProcessor('should preserve parameter annotations as const instances.',
       'parameter_metadata/soup.dart');
 
-  _testNgDeps('should recognize custom annotations with package: imports',
+  _testProcessor('should recognize custom annotations with package: imports',
       'custom_metadata/package_soup.dart',
       customDescriptors: [
-    const AnnotationDescriptor('Soup', 'package:soup/soup.dart', 'Component'),
+    const ClassDescriptor('Soup', 'package:soup/soup.dart',
+        superClass: 'Component'),
   ]);
 
-  _testNgDeps('should recognize custom annotations with relative imports',
+  _testProcessor('should recognize custom annotations with relative imports',
       'custom_metadata/relative_soup.dart',
       assetId: new AssetId('soup', 'lib/relative_soup.dart'),
       customDescriptors: [
-    const AnnotationDescriptor(
-        'Soup', 'package:soup/annotations/soup.dart', 'Component'),
+    const ClassDescriptor('Soup', 'package:soup/annotations/soup.dart',
+        superClass: 'Component'),
   ]);
 
-  _testNgDeps('Requires the specified import.', 'custom_metadata/bad_soup.dart',
+  _testProcessor(
+      'Requires the specified import.', 'custom_metadata/bad_soup.dart',
       customDescriptors: [
-    const AnnotationDescriptor('Soup', 'package:soup/soup.dart', 'Component'),
+    const ClassDescriptor('Soup', 'package:soup/soup.dart',
+        superClass: 'Component'),
   ]);
 
-  _testNgDeps(
+  _testProcessor(
       'should inline `templateUrl` values.', 'url_expression_files/hello.dart');
 
   var absoluteReader = new TestAssetReader();
@@ -50,11 +56,11 @@ void allTests() {
   absoluteReader.addAsset(new AssetId('other_package', 'lib/template.css'),
       readFile(
           'directive_processor/absolute_url_expression_files/template.css'));
-  _testNgDeps('should inline `templateUrl` and `styleUrls` values expressed as'
-      ' absolute urls.', 'absolute_url_expression_files/hello.dart',
+  _testProcessor('should inline `templateUrl` and `styleUrls` values expressed'
+      ' as absolute urls.', 'absolute_url_expression_files/hello.dart',
       reader: absoluteReader);
 
-  _testNgDeps(
+  _testProcessor(
       'should inline multiple `styleUrls` values expressed as absolute urls.',
       'multiple_style_urls_files/hello.dart');
 
@@ -64,24 +70,38 @@ void allTests() {
       readFile('directive_processor/multiple_style_urls_files/template.css'));
   absoluteReader.addAsset(new AssetId('a', 'lib/template_other.css'), readFile(
       'directive_processor/multiple_style_urls_files/template_other.css'));
-  _testNgDeps(
+  _testProcessor(
       'shouldn\'t inline multiple `styleUrls` values expressed as absolute '
       'urls.', 'multiple_style_urls_not_inlined_files/hello.dart',
       inlineViews: false, reader: absoluteReader);
 
-  _testNgDeps('should inline `templateUrl`s expressed as adjacent strings.',
+  _testProcessor('should inline `templateUrl`s expressed as adjacent strings.',
       'split_url_expression_files/hello.dart');
 
-  _testNgDeps('should report implemented types as `interfaces`.',
+  _testProcessor('should report implemented types as `interfaces`.',
       'interfaces_files/soup.dart');
 
-  _testNgDeps('should not include transitively implemented types.',
+  _testProcessor('should not include transitively implemented types.',
       'interface_chain_files/soup.dart');
 
-  _testNgDeps('should not include superclasses in `interfaces`.',
+  _testProcessor('should not include superclasses in `interfaces`.',
       'superclass_files/soup.dart');
 
-  _testNgDeps(
+  _testProcessor(
+      'should populate `lifecycle` when lifecycle interfaces are present.',
+      'interface_lifecycle_files/soup.dart');
+
+  _testProcessor('should populate multiple `lifecycle` values when necessary.',
+      'multiple_interface_lifecycle_files/soup.dart');
+
+  _testProcessor(
+      'should populate `lifecycle` when lifecycle superclass is present.',
+      'superclass_lifecycle_files/soup.dart');
+
+  _testProcessor('should populate `lifecycle` with prefix when necessary.',
+      'prefixed_interface_lifecycle_files/soup.dart');
+
+  _testProcessor(
       'should not throw/hang on invalid urls', 'invalid_url_files/hello.dart',
       expectedLogs: [
     'ERROR: Uri /bad/absolute/url.html not supported from angular2|test/'
@@ -94,42 +114,61 @@ void allTests() {
         'test/transform/directive_processor/invalid_url_files/hello.dart'
   ]);
 
-  _testNgDeps('should find and register static functions.',
+  _testProcessor('should find and register static functions.',
       'static_function_files/hello.dart');
+
+  _testProcessor('should find direcive aliases patterns.',
+      'directive_aliases_files/hello.dart', reader: absoluteReader);
 }
 
-void _testNgDeps(String name, String inputPath,
+void _testProcessor(String name, String inputPath,
     {List<AnnotationDescriptor> customDescriptors: const [], AssetId assetId,
-    AssetReader reader, List<String> expectedLogs, bool inlineViews: true}) {
-  it(name, () async {
-    if (expectedLogs != null) {
-      log.setLogger(new RecordingLogger());
-    }
+    AssetReader reader, List<String> expectedLogs, bool inlineViews: true,
+    bool isolate: false}) {
+  var testFn = isolate ? iit : it;
+  testFn(name, () async {
+    var logger = new RecordingLogger();
+    await log.setZoned(logger, () async {
+      var inputId = _assetIdForPath(inputPath);
+      if (reader == null) {
+        reader = new TestAssetReader();
+      }
+      if (assetId != null) {
+        reader.addAsset(assetId, await reader.readAsString(inputId));
+        inputId = assetId;
+      }
+      var expectedNgDepsPath = path.join(path.dirname(inputPath), 'expected',
+          path.basename(inputPath).replaceFirst('.dart', '.ng_deps.dart'));
+      var expectedNgDepsId = _assetIdForPath(expectedNgDepsPath);
 
-    var inputId = _assetIdForPath(inputPath);
-    if (reader == null) {
-      reader = new TestAssetReader();
-    }
-    if (assetId != null) {
-      reader.addAsset(assetId, await reader.readAsString(inputId));
-      inputId = assetId;
-    }
-    var expectedPath = path.join(path.dirname(inputPath), 'expected',
-        path.basename(inputPath).replaceFirst('.dart', '.ng_deps.dart'));
-    var expectedId = _assetIdForPath(expectedPath);
+      var expectedAliasesPath = path.join(path.dirname(inputPath), 'expected',
+          path.basename(inputPath).replaceFirst('.dart', '.aliases.json'));
+      var expectedAliasesId = _assetIdForPath(expectedAliasesPath);
 
-    var annotationMatcher = new AnnotationMatcher()..addAll(customDescriptors);
-    var output =
-        await createNgDeps(reader, inputId, annotationMatcher, inlineViews);
-    if (output == null) {
-      expect(await reader.hasInput(expectedId)).toBeFalse();
+      var annotationMatcher = new AnnotationMatcher()
+        ..addAll(customDescriptors);
+      var ngMeta = new NgMeta.empty();
+      var output = await createNgDeps(
+          reader, inputId, annotationMatcher, ngMeta, inlineViews: inlineViews);
+      if (output == null) {
+        expect(await reader.hasInput(expectedNgDepsId)).toBeFalse();
+      } else {
+        var input = await reader.readAsString(expectedNgDepsId);
+        expect(formatter.format(output)).toEqual(formatter.format(input));
+      }
+      if (ngMeta.isEmpty) {
+        expect(await reader.hasInput(expectedAliasesId)).toBeFalse();
+      } else {
+        var expectedJson = await reader.readAsString(expectedAliasesId);
+        expect(new JsonEncoder.withIndent('  ').convert(ngMeta.toJson()))
+            .toEqual(expectedJson.trim());
+      }
+    });
+
+    if (expectedLogs == null) {
+      expect(logger.hasErrors).toBeFalse();
     } else {
-      var input = await reader.readAsString(expectedId);
-      expect(formatter.format(output)).toEqual(formatter.format(input));
-    }
-
-    if (expectedLogs != null) {
-      expect((log.logger as RecordingLogger).logs, expectedLogs);
+      expect(logger.logs, expectedLogs);
     }
   });
 }
@@ -143,6 +182,8 @@ class RecordingLogger implements BuildLogger {
   @override
   final bool convertErrorsToWarnings = false;
 
+  bool hasErrors = false;
+
   List<String> logs = [];
 
   void _record(prefix, msg) => logs.add('$prefix: $msg');
@@ -153,7 +194,10 @@ class RecordingLogger implements BuildLogger {
 
   void warning(msg, {AssetId asset, SourceSpan span}) => _record('WARN', msg);
 
-  void error(msg, {AssetId asset, SourceSpan span}) => _record('ERROR', msg);
+  void error(msg, {AssetId asset, SourceSpan span}) {
+    hasErrors = true;
+    _record('ERROR', msg);
+  }
 
   Future writeOutput() => throw new UnimplementedError();
   Future addLogFilesFromAsset(AssetId id, [int nextNumber = 1]) =>

@@ -7,7 +7,7 @@ import "../annotations_impl/annotations.dart" show Directive;
 import "package:angular2/src/reflection/reflection.dart" show reflector;
 
 /**
- * Resolve a {@link Type} for {@link Directive}.
+ * Resolve a `Type` for {@link Directive}.
  *
  * This interface can be overridden by the application developer to create custom behavior.
  *
@@ -16,7 +16,7 @@ import "package:angular2/src/reflection/reflection.dart" show reflector;
 @Injectable()
 class DirectiveResolver {
   /**
-   * Return {@link Directive} for a given {@link Type}.
+   * Return {@link Directive} for a given `Type`.
    */
   Directive resolve(Type type) {
     var annotations = reflector.annotations(resolveForwardRef(type));

@@ -10,9 +10,10 @@ import "metadata.dart"
     show
         InjectMetadata,
         InjectableMetadata,
-        VisibilityMetadata,
         OptionalMetadata,
-        DEFAULT_VISIBILITY,
+        SelfMetadata,
+        HostMetadata,
+        SkipSelfMetadata,
         DependencyMetadata;
 import "exceptions.dart" show NoAnnotationError;
 import "forward_ref.dart" show resolveForwardRef;
@@ -23,11 +24,13 @@ import "forward_ref.dart" show resolveForwardRef;
 class Dependency {
   Key key;
   bool optional;
-  VisibilityMetadata visibility;
+  dynamic lowerBoundVisibility;
+  dynamic upperBoundVisibility;
   List<dynamic> properties;
-  Dependency(this.key, this.optional, this.visibility, this.properties) {}
+  Dependency(this.key, this.optional, this.lowerBoundVisibility,
+      this.upperBoundVisibility, this.properties) {}
   static Dependency fromKey(Key key) {
-    return new Dependency(key, false, DEFAULT_VISIBILITY, []);
+    return new Dependency(key, false, null, null, []);
   }
 }
 const _EMPTY_LIST = const [];
@@ -290,14 +293,14 @@ class BindingBuilder {
    * expect(injector.get(String)).toEqual('Hello');
    * ```
    */
-  Binding toValue(value) {
+  Binding toValue(dynamic value) {
     return new Binding(this.token, toValue: value);
   }
   /**
    * Binds a key to the alias for an existing key.
    *
    * An alias means that we will return the same instance as if the alias token was used. (This is
-   * in contrast to `toClass` where a separet instance of `toClass` will be returned.)
+   * in contrast to `toClass` where a separate instance of `toClass` will be returned.)
    *
    * ## Example
    *
@@ -326,7 +329,7 @@ class BindingBuilder {
    * expect(injectorClass.get(Vehicle) instanceof Car).toBe(true);
    * ```
    */
-  Binding toAlias(aliasToken) {
+  Binding toAlias(dynamic aliasToken) {
     if (isBlank(aliasToken)) {
       throw new BaseException(
           '''Can not alias ${ stringify ( this . token )} to a blank value!''');
@@ -372,39 +375,48 @@ List<Dependency> _dependenciesFor(typeOrFunc) {
   return ListWrapper.map(
       params, (List<dynamic> p) => _extractToken(typeOrFunc, p, params));
 }
-Dependency _extractToken(typeOrFunc, annotations, List<List<dynamic>> params) {
+Dependency _extractToken(typeOrFunc, metadata, List<List<dynamic>> params) {
   var depProps = [];
   var token = null;
   var optional = false;
-  if (!isArray(annotations)) {
-    return _createDependency(
-        annotations, optional, DEFAULT_VISIBILITY, depProps);
+  if (!isArray(metadata)) {
+    return _createDependency(metadata, optional, null, null, depProps);
   }
-  var visibility = DEFAULT_VISIBILITY;
-  for (var i = 0; i < annotations.length; ++i) {
-    var paramAnnotation = annotations[i];
-    if (paramAnnotation is Type) {
-      token = paramAnnotation;
-    } else if (paramAnnotation is InjectMetadata) {
-      token = paramAnnotation.token;
-    } else if (paramAnnotation is OptionalMetadata) {
+  var lowerBoundVisibility = null;
+  ;
+  var upperBoundVisibility = null;
+  ;
+  for (var i = 0; i < metadata.length; ++i) {
+    var paramMetadata = metadata[i];
+    if (paramMetadata is Type) {
+      token = paramMetadata;
+    } else if (paramMetadata is InjectMetadata) {
+      token = paramMetadata.token;
+    } else if (paramMetadata is OptionalMetadata) {
       optional = true;
-    } else if (paramAnnotation is VisibilityMetadata) {
-      visibility = paramAnnotation;
-    } else if (paramAnnotation is DependencyMetadata) {
-      if (isPresent(paramAnnotation.token)) {
-        token = paramAnnotation.token;
+    } else if (paramMetadata is SelfMetadata) {
+      upperBoundVisibility = paramMetadata;
+    } else if (paramMetadata is HostMetadata) {
+      upperBoundVisibility = paramMetadata;
+    } else if (paramMetadata is SkipSelfMetadata) {
+      lowerBoundVisibility = paramMetadata;
+    } else if (paramMetadata is DependencyMetadata) {
+      if (isPresent(paramMetadata.token)) {
+        token = paramMetadata.token;
       }
-      depProps.add(paramAnnotation);
+      depProps.add(paramMetadata);
     }
   }
   token = resolveForwardRef(token);
   if (isPresent(token)) {
-    return _createDependency(token, optional, visibility, depProps);
+    return _createDependency(
+        token, optional, lowerBoundVisibility, upperBoundVisibility, depProps);
   } else {
     throw new NoAnnotationError(typeOrFunc, params);
   }
 }
-Dependency _createDependency(token, optional, visibility, depProps) {
-  return new Dependency(Key.get(token), optional, visibility, depProps);
+Dependency _createDependency(
+    token, optional, lowerBoundVisibility, upperBoundVisibility, depProps) {
+  return new Dependency(Key.get(token), optional, lowerBoundVisibility,
+      upperBoundVisibility, depProps);
 }

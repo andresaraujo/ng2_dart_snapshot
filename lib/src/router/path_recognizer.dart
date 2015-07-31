@@ -12,6 +12,8 @@ import "package:angular2/src/facade/lang.dart"
 import "package:angular2/src/facade/async.dart" show Future, PromiseWrapper;
 import "package:angular2/src/facade/collection.dart"
     show Map, MapWrapper, Map, StringMapWrapper, List, ListWrapper;
+import "package:angular2/src/router/helpers.dart"
+    show parseAndAssignParamString;
 import "url.dart" show escapeRegex;
 import "route_handler.dart" show RouteHandler;
 // TODO(jeffbcross): implement as interface when ts2dart adds support:
@@ -54,17 +56,6 @@ String normalizeString(dynamic obj) {
   } else {
     return obj.toString();
   }
-}
-parseAndAssignMatrixParams(keyValueMap, matrixString) {
-  if (matrixString[0] == ";") {
-    matrixString = matrixString.substring(1);
-  }
-  matrixString.split(";").forEach((entry) {
-    var tuple = entry.split("=");
-    var key = tuple[0];
-    var value = tuple.length > 1 ? tuple[1] : true;
-    keyValueMap[key] = value;
-  });
 }
 class ContinuationSegment extends Segment {}
 class StaticSegment extends Segment {
@@ -170,15 +161,31 @@ Map<String, dynamic> parsePathString(String route) {
 List<String> splitBySlash(String url) {
   return url.split("/");
 }
+var RESERVED_CHARS = RegExpWrapper.create("//|\\(|\\)|;|\\?|=");
+assertPath(String path) {
+  if (StringWrapper.contains(path, "#")) {
+    throw new BaseException(
+        '''Path "${ path}" should not include "#". Use "HashLocationStrategy" instead.''');
+  }
+  var illegalCharacter = RegExpWrapper.firstMatch(RESERVED_CHARS, path);
+  if (isPresent(illegalCharacter)) {
+    throw new BaseException(
+        '''Path "${ path}" contains "${ illegalCharacter [ 0 ]}" which is not allowed in a route config.''');
+  }
+}
 // represents something like '/foo/:bar'
 class PathRecognizer {
   String path;
   RouteHandler handler;
+  bool isRoot;
   List<Segment> segments;
   RegExp regex;
   num specificity;
   bool terminal = true;
-  PathRecognizer(this.path, this.handler) {
+  static RegExp matrixRegex = RegExpWrapper.create("^(.*/[^/]+?)(;[^/]+)?/?\$");
+  static RegExp queryRegex = RegExpWrapper.create("^(.*/[^/]+?)(\\?[^/]+)?\$");
+  PathRecognizer(this.path, this.handler, [this.isRoot = false]) {
+    assertPath(path);
     var parsed = parsePathString(path);
     var specificity = parsed["specificity"];
     var segments = parsed["segments"];
@@ -202,16 +209,18 @@ class PathRecognizer {
     var segmentsLimit = this.segments.length - 1;
     var containsStarSegment =
         segmentsLimit >= 0 && this.segments[segmentsLimit] is StarSegment;
-    var matrixString;
+    var paramsString,
+        useQueryString = this.isRoot && this.terminal;
     if (!containsStarSegment) {
-      var matches = RegExpWrapper.firstMatch(
-          RegExpWrapper.create("^(.*/[^/]+?)(;[^/]+)?/?\$"), url);
+      var matches = RegExpWrapper.firstMatch(useQueryString
+          ? PathRecognizer.queryRegex
+          : PathRecognizer.matrixRegex, url);
       if (isPresent(matches)) {
         url = matches[1];
-        matrixString = matches[2];
+        paramsString = matches[2];
       }
-      url = StringWrapper.replaceAll(
-          url, new RegExp(r'(;[^\/]+)(?=(\/|\Z))'), "");
+      url =
+          StringWrapper.replaceAll(url, new RegExp(r'(;[^\/]+)(?=(\/|$))'), "");
     }
     var params = StringMapWrapper.create();
     var urlPart = url;
@@ -227,16 +236,18 @@ class PathRecognizer {
         params[segment.name] = match[1];
       }
     }
-    if (isPresent(matrixString) &&
-        matrixString.length > 0 &&
-        matrixString[0] == ";") {
-      parseAndAssignMatrixParams(params, matrixString);
+    if (isPresent(paramsString) && paramsString.length > 0) {
+      var expectedStartingValue = useQueryString ? "?" : ";";
+      if (paramsString[0] == expectedStartingValue) {
+        parseAndAssignParamString(expectedStartingValue, paramsString, params);
+      }
     }
     return params;
   }
   String generate(Map<String, dynamic> params) {
     var paramTokens = new TouchMap(params);
     var applyLeadingSlash = false;
+    var useQueryString = this.isRoot && this.terminal;
     var url = "";
     for (var i = 0; i < this.segments.length; i++) {
       var segment = this.segments[i];
@@ -247,12 +258,23 @@ class PathRecognizer {
       }
     }
     var unusedParams = paramTokens.getUnused();
-    StringMapWrapper.forEach(unusedParams, (value, key) {
-      url += ";" + key;
-      if (isPresent(value)) {
-        url += "=" + value;
-      }
-    });
+    if (!StringMapWrapper.isEmpty(unusedParams)) {
+      url += useQueryString ? "?" : ";";
+      var paramToken = useQueryString ? "&" : ";";
+      var i = 0;
+      StringMapWrapper.forEach(unusedParams, (value, key) {
+        if (i++ > 0) {
+          url += paramToken;
+        }
+        url += key;
+        if (!isPresent(value) && useQueryString) {
+          value = "true";
+        }
+        if (isPresent(value)) {
+          url += "=" + value;
+        }
+      });
+    }
     if (applyLeadingSlash) {
       url += "/";
     }

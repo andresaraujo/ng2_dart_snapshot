@@ -35,7 +35,7 @@ class PromisePipe implements Pipe {
   Object _latestReturnedValue = null;
   Future<dynamic> _sourcePromise;
   PromisePipe(this._ref) {}
-  bool supports(promise) {
+  bool supports(dynamic promise) {
     return isPromise(promise);
   }
   void onDestroy() {
@@ -75,7 +75,7 @@ class PromisePipe implements Pipe {
  * Provides a factory for [PromisePipe].
  */
 class PromisePipeFactory implements PipeFactory {
-  bool supports(promise) {
+  bool supports(dynamic promise) {
     return isPromise(promise);
   }
   Pipe create(ChangeDetectorRef cdRef) {

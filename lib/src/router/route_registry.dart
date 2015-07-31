@@ -14,10 +14,13 @@ import "package:angular2/src/facade/lang.dart"
         isStringMap,
         isFunction,
         StringWrapper,
-        BaseException;
-import "route_config_impl.dart" show RouteConfig;
+        BaseException,
+        getTypeNameForDebugging;
+import "route_config_impl.dart"
+    show RouteConfig, AsyncRoute, Route, Redirect, RouteDefinition;
 import "package:angular2/src/reflection/reflection.dart" show reflector;
 import "package:angular2/di.dart" show Injectable;
+import "route_config_nomalizer.dart" show normalizeRouteConfig;
 
 /**
  * The RouteRegistry holds route configurations for each component in an Angular app.
@@ -30,34 +33,27 @@ class RouteRegistry {
   /**
    * Given a component and a configuration object, add the route to this registry
    */
-  void config(parentComponent, Map<String, dynamic> config) {
-    assertValidConfig(config);
+  void config(dynamic parentComponent, RouteDefinition config,
+      [bool isRootLevelRoute = false]) {
+    config = normalizeRouteConfig(config);
     RouteRecognizer recognizer = this._rules[parentComponent];
     if (isBlank(recognizer)) {
-      recognizer = new RouteRecognizer();
+      recognizer = new RouteRecognizer(isRootLevelRoute);
       this._rules[parentComponent] = recognizer;
     }
-    if (StringMapWrapper.contains(config, "redirectTo")) {
-      recognizer.addRedirect(config["path"], config["redirectTo"]);
-      return;
-    }
-    config = StringMapWrapper.merge(config, {
-      "component": normalizeComponentDeclaration(config["component"])
-    });
-    var component = config["component"];
-    var terminal = recognizer.addConfig(config["path"], config, config["as"]);
-    if (component["type"] == "constructor") {
+    var terminal = recognizer.config(config);
+    if (config is Route) {
       if (terminal) {
-        assertTerminalComponent(component["constructor"], config["path"]);
+        assertTerminalComponent(config.component, config.path);
       } else {
-        this.configFromComponent(component["constructor"]);
+        this.configFromComponent(config.component);
       }
     }
   }
   /**
    * Reads the annotations of a component and configures the registry based on them
    */
-  void configFromComponent(component) {
+  void configFromComponent(dynamic component, [bool isRootComponent = false]) {
     if (!isType(component)) {
       return;
     }
@@ -72,8 +68,8 @@ class RouteRegistry {
       for (var i = 0; i < annotations.length; i++) {
         var annotation = annotations[i];
         if (annotation is RouteConfig) {
-          ListWrapper.forEach(
-              annotation.configs, (config) => this.config(component, config));
+          ListWrapper.forEach(annotation.configs,
+              (config) => this.config(component, config, isRootComponent));
         }
       }
     }
@@ -82,7 +78,7 @@ class RouteRegistry {
    * Given a URL and a parent component, return the most specific instruction for navigating
    * the application into the state specified by the url
    */
-  Future<Instruction> recognize(String url, parentComponent) {
+  Future<Instruction> recognize(String url, dynamic parentComponent) {
     var componentRecognizer = this._rules[parentComponent];
     if (isBlank(componentRecognizer)) {
       return PromiseWrapper.resolve(null);
@@ -110,8 +106,8 @@ class RouteRegistry {
       this.configFromComponent(componentType);
       if (partialMatch.unmatchedUrl.length == 0) {
         if (recognizer.terminal) {
-          return new Instruction(
-              componentType, partialMatch.matchedUrl, recognizer);
+          return new Instruction(componentType, partialMatch.matchedUrl,
+              recognizer, null, partialMatch.params());
         } else {
           return null;
         }
@@ -132,11 +128,15 @@ class RouteRegistry {
    * Given a normalized list with component names and params like: `['user', {id: 3 }]`
    * generates a url with a leading slash relative to the provided `parentComponent`.
    */
-  String generate(List<dynamic> linkParams, parentComponent) {
+  String generate(List<dynamic> linkParams, dynamic parentComponent) {
     var url = "";
     var componentCursor = parentComponent;
     for (var i = 0; i < linkParams.length; i += 1) {
       var segment = linkParams[i];
+      if (isBlank(componentCursor)) {
+        throw new BaseException(
+            '''Could not find route named "${ segment}".''');
+      }
       if (!isString(segment)) {
         throw new BaseException(
             '''Unexpected segment "${ segment}" in link DSL. Expected a string.''');
@@ -155,58 +155,17 @@ class RouteRegistry {
       var componentRecognizer = this._rules[componentCursor];
       if (isBlank(componentRecognizer)) {
         throw new BaseException(
-            '''Could not find route config for "${ segment}".''');
+            '''Component "${ getTypeNameForDebugging ( componentCursor )}" has no route config.''');
       }
       var response = componentRecognizer.generate(segment, params);
+      if (isBlank(response)) {
+        throw new BaseException(
+            '''Component "${ getTypeNameForDebugging ( componentCursor )}" has no route named "${ segment}".''');
+      }
       url += response["url"];
       componentCursor = response["nextComponent"];
     }
     return url;
-  }
-}
-/*
- * A config should have a "path" property, and exactly one of:
- * - `component`
- * - `redirectTo`
- */
-var ALLOWED_TARGETS = ["component", "redirectTo"];
-void assertValidConfig(Map<String, dynamic> config) {
-  if (!StringMapWrapper.contains(config, "path")) {
-    throw new BaseException(
-        '''Route config should contain a "path" property''');
-  }
-  var targets = 0;
-  ListWrapper.forEach(ALLOWED_TARGETS, (target) {
-    if (StringMapWrapper.contains(config, target)) {
-      targets += 1;
-    }
-  });
-  if (targets != 1) {
-    throw new BaseException(
-        '''Route config should contain exactly one \'component\', or \'redirectTo\' property''');
-  }
-}
-/*
- * Returns a StringMap like: `{ 'constructor': SomeType, 'type': 'constructor' }`
- */
-var VALID_COMPONENT_TYPES = ["constructor", "loader"];
-Map<String, dynamic> normalizeComponentDeclaration(dynamic config) {
-  if (isType(config)) {
-    return {"constructor": config, "type": "constructor"};
-  } else if (isStringMap(config)) {
-    if (isBlank(config["type"])) {
-      throw new BaseException(
-          '''Component declaration when provided as a map should include a \'type\' property''');
-    }
-    var componentType = config["type"];
-    if (!ListWrapper.contains(VALID_COMPONENT_TYPES, componentType)) {
-      throw new BaseException(
-          '''Invalid component type \'${ componentType}\'''');
-    }
-    return config;
-  } else {
-    throw new BaseException(
-        '''Component declaration should be either a Map or a Type''');
   }
 }
 /*

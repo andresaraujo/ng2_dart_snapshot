@@ -18,7 +18,6 @@ main() => allTests();
 
 void allTests() {
   Html5LibDomAdapter.makeCurrent();
-  beforeEach(() => setLogger(new PrintLogger()));
 
   describe('registrations', () {
     noChangeDetectorTests();
@@ -32,10 +31,25 @@ void changeDetectorTests() {
   // TODO(tbosch): This is just a temporary test that makes sure that the dart server and
   // dart browser is in sync. Change this to "not contains notifyBinding"
   // when https://github.com/angular/angular/issues/3019 is solved.
-  it('shouldn always notifyBinding for template variables', () async {
+  it('shouldn always notifyDispatcher for template variables', () async {
     var inputPath = 'template_compiler/ng_for_files/hello.ng_deps.dart';
     var output = await (process(new AssetId('a', inputPath)));
-    expect(output).toContain('notifyOnBinding');
+    expect(output).toContain('notifyDispatcher');
+  });
+
+  it('should include directives mentioned in directive aliases.', () async {
+    // Input 2 is the same as input1, but contains the directive aliases
+    // inlined.
+    var input1Path =
+        'template_compiler/directive_aliases_files/hello1.ng_deps.dart';
+    var input2Path =
+        'template_compiler/directive_aliases_files/hello2.ng_deps.dart';
+    // Except for the directive argument in the View annotation, the generated
+    // change detectors are identical.
+    var output1 = (await process(new AssetId('a', input1Path))).replaceFirst(
+        'directives: const [alias1]', 'directives: const [GoodbyeCmp]');
+    var output2 = await process(new AssetId('a', input2Path));
+    _formatThenExpectEquals(output1, output2);
   });
 }
 

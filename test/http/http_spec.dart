@@ -15,7 +15,8 @@ import "package:angular2/test_lib.dart"
         SpyObject;
 import "package:angular2/src/http/http.dart" show Http;
 import "package:angular2/di.dart" show Injector, bind;
-import "package:angular2/src/http/backends/mock_backend.dart" show MockBackend;
+import "package:angular2/src/http/backends/mock_backend.dart"
+    show MockBackend, MockConnection;
 import "package:angular2/src/http/static_response.dart" show Response;
 import "package:angular2/src/http/enums.dart" show RequestMethods;
 import "package:angular2/src/http/base_request_options.dart"

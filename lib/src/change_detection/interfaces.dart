@@ -3,7 +3,7 @@ library angular2.src.change_detection.interfaces;
 import "package:angular2/src/facade/collection.dart" show List;
 import "parser/locals.dart" show Locals;
 import "binding_record.dart" show BindingRecord;
-import "directive_record.dart" show DirectiveRecord;
+import "directive_record.dart" show DirectiveIndex, DirectiveRecord;
 
 /**
  * Interface used by Angular to control the change detection strategy for an application.
@@ -37,7 +37,18 @@ class ChangeDetection {
   }
   const ChangeDetection();
 }
+class DebugContext {
+  dynamic element;
+  dynamic componentElement;
+  dynamic directive;
+  dynamic context;
+  dynamic locals;
+  dynamic injector;
+  DebugContext(this.element, this.componentElement, this.directive,
+      this.context, this.locals, this.injector) {}
+}
 abstract class ChangeDispatcher {
+  DebugContext getDebugContext(num elementIndex, DirectiveIndex directiveIndex);
   void notifyOnBinding(BindingRecord bindingRecord, dynamic value);
   void notifyOnAllChangesDone();
 }
@@ -57,7 +68,7 @@ abstract class ChangeDetector {
   void checkNoChanges();
 }
 abstract class ProtoChangeDetector {
-  ChangeDetector instantiate(dynamic dispatcher);
+  ChangeDetector instantiate(ChangeDispatcher dispatcher);
 }
 class ChangeDetectorDefinition {
   String id;
@@ -65,6 +76,8 @@ class ChangeDetectorDefinition {
   List<String> variableNames;
   List<BindingRecord> bindingRecords;
   List<DirectiveRecord> directiveRecords;
+  bool generateCheckNoChanges;
   ChangeDetectorDefinition(this.id, this.strategy, this.variableNames,
-      this.bindingRecords, this.directiveRecords) {}
+      this.bindingRecords, this.directiveRecords, this.generateCheckNoChanges) {
+  }
 }

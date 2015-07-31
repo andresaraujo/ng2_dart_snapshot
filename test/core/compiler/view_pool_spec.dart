@@ -28,10 +28,11 @@ main() {
       return new AppViewPool(capacity);
     }
     createProtoView() {
-      return new AppProtoView(null, null, null, null);
+      return new AppProtoView(null, null, null, null, null, null, null);
     }
     createView(pv) {
-      return new AppView(null, pv, new Map());
+      return new AppView(
+          null, pv, null, null, null, null, new Map(), null, null);
     }
     it("should support multiple AppProtoViews", () {
       var vf = createViewPool(capacity: 2);

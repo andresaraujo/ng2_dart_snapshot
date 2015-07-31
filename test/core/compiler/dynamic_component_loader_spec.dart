@@ -15,7 +15,6 @@ import "package:angular2/test_lib.dart"
         beforeEachBindings,
         it,
         xit,
-        viewRootNodes,
         TestComponentBuilder,
         RootTestComponent,
         inspectElement,
@@ -27,7 +26,7 @@ import "package:angular2/src/core/annotations_impl/view.dart" as viewAnn;
 import "package:angular2/src/core/compiler/dynamic_component_loader.dart"
     show DynamicComponentLoader;
 import "package:angular2/src/core/compiler/element_ref.dart" show ElementRef;
-import "package:angular2/src/render/dom/dom_renderer.dart" show DOCUMENT_TOKEN;
+import "package:angular2/src/render/render.dart" show DOCUMENT_TOKEN;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
 
 main() {
@@ -234,8 +233,7 @@ main() {
           el.detectChanges();
           expect(rootEl).toHaveText("new");
           componentRef.dispose();
-          expect(rootEl).toHaveText("");
-          expect(rootEl.parentNode).toBe(doc.body);
+          expect(rootEl.parentNode).toBeFalsy();
           async.done();
         });
       }));
@@ -253,7 +251,7 @@ class ChildComp {
 class DynamicallyCreatedComponentService {}
 @Component(
     selector: "hello-cmp",
-    viewInjector: const [DynamicallyCreatedComponentService],
+    viewBindings: const [DynamicallyCreatedComponentService],
     lifecycle: const [LifecycleEvent.onDestroy])
 @View(template: "{{greeting}}")
 class DynamicallyCreatedCmp {

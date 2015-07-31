@@ -4,9 +4,9 @@ import "package:angular2/di.dart" show Injectable;
 import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, MapWrapper;
 import "package:angular2/src/facade/lang.dart"
-    show isPresent, isBlank, BaseException;
+    show isPresent, isBlank, BaseException, assertionsEnabled;
 import "package:angular2/src/reflection/reflection.dart" show reflector;
-import "package:angular2/change_detection.dart"
+import "package:angular2/src/change_detection/change_detection.dart"
     show
         ChangeDetection,
         DirectiveIndex,
@@ -14,7 +14,8 @@ import "package:angular2/change_detection.dart"
         DirectiveRecord,
         ProtoChangeDetector,
         DEFAULT,
-        ChangeDetectorDefinition;
+        ChangeDetectorDefinition,
+        ASTWithSource;
 import "package:angular2/src/render/api.dart" as renderApi;
 import "view.dart" show AppProtoView;
 import "element_binder.dart" show ElementBinder;
@@ -22,16 +23,15 @@ import "element_injector.dart" show ProtoElementInjector, DirectiveBinding;
 
 class BindingRecordsCreator {
   Map<num, DirectiveRecord> _directiveRecordsMap = new Map();
-  num _textNodeIndex = 0;
-  List<BindingRecord> getBindingRecords(
+  List<BindingRecord> getBindingRecords(List<ASTWithSource> textBindings,
       List<renderApi.ElementBinder> elementBinders,
       List<renderApi.DirectiveMetadata> allDirectiveMetadatas) {
     var bindings = [];
+    this._createTextNodeRecords(bindings, textBindings);
     for (var boundElementIndex = 0;
         boundElementIndex < elementBinders.length;
         boundElementIndex++) {
       var renderElementBinder = elementBinders[boundElementIndex];
-      this._createTextNodeRecords(bindings, renderElementBinder);
       this._createElementPropertyRecords(
           bindings, boundElementIndex, renderElementBinder);
       this._createDirectiveRecords(bindings, boundElementIndex,
@@ -54,12 +54,11 @@ class BindingRecordsCreator {
     }
     return directiveRecords;
   }
-  _createTextNodeRecords(List<BindingRecord> bindings,
-      renderApi.ElementBinder renderElementBinder) {
-    if (isBlank(renderElementBinder.textBindings)) return;
-    ListWrapper.forEach(renderElementBinder.textBindings, (b) {
-      bindings.add(BindingRecord.createForTextNode(b, this._textNodeIndex++));
-    });
+  _createTextNodeRecords(
+      List<BindingRecord> bindings, List<ASTWithSource> textBindings) {
+    for (var i = 0; i < textBindings.length; i++) {
+      bindings.add(BindingRecord.createForTextNode(textBindings[i], i));
+    }
   }
   _createElementPropertyRecords(List<BindingRecord> bindings,
       num boundElementIndex, renderApi.ElementBinder renderElementBinder) {
@@ -172,7 +171,8 @@ class ProtoViewFactory {
         (changeDetectorDef) =>
             this._changeDetection.createProtoChangeDetector(changeDetectorDef));
     var appProtoViews = ListWrapper.createFixedSize(nestedPvsWithIndex.length);
-    ListWrapper.forEach(nestedPvsWithIndex, (pvWithIndex) {
+    ListWrapper.forEach(nestedPvsWithIndex,
+        (RenderProtoViewWithIndex pvWithIndex) {
       var appProtoView = _createAppProtoView(pvWithIndex.renderProtoView,
           protoChangeDetectors[pvWithIndex.index],
           nestedPvVariableBindings[pvWithIndex.index], allDirectives);
@@ -206,6 +206,7 @@ List<RenderProtoViewWithIndex> _collectNestedProtoViews(
   if (isBlank(result)) {
     result = [];
   }
+  // reserve the place in the array
   result.add(new RenderProtoViewWithIndex(
       renderProtoView, result.length, parentIndex, boundElementIndex));
   var currentIndex = result.length - 1;
@@ -228,7 +229,8 @@ List<ChangeDetectorDefinition> _getChangeDetectorDefinitions(
     var elementBinders = pvWithIndex.renderProtoView.elementBinders;
     var bindingRecordsCreator = new BindingRecordsCreator();
     var bindingRecords = bindingRecordsCreator.getBindingRecords(
-        elementBinders, allRenderDirectiveMetadata);
+        pvWithIndex.renderProtoView.textBindings, elementBinders,
+        allRenderDirectiveMetadata);
     var directiveRecords = bindingRecordsCreator.getDirectiveRecords(
         elementBinders, allRenderDirectiveMetadata);
     var strategyName = DEFAULT;
@@ -246,8 +248,8 @@ List<ChangeDetectorDefinition> _getChangeDetectorDefinitions(
     var id =
         '''${ hostComponentMetadata . id}_${ typeString}_${ pvWithIndex . index}''';
     var variableNames = nestedPvVariableNames[pvWithIndex.index];
-    return new ChangeDetectorDefinition(
-        id, strategyName, variableNames, bindingRecords, directiveRecords);
+    return new ChangeDetectorDefinition(id, strategyName, variableNames,
+        bindingRecords, directiveRecords, assertionsEnabled());
   });
 }
 AppProtoView _createAppProtoView(renderApi.ProtoViewDto renderProtoView,
@@ -255,8 +257,14 @@ AppProtoView _createAppProtoView(renderApi.ProtoViewDto renderProtoView,
     Map<String, String> variableBindings,
     List<DirectiveBinding> allDirectives) {
   var elementBinders = renderProtoView.elementBinders;
-  var protoView = new AppProtoView(renderProtoView.render, protoChangeDetector,
-      variableBindings, createVariableLocations(elementBinders));
+  // Embedded ProtoViews that contain `<ng-content>` will be merged into their parents and use
+
+  // a RenderFragmentRef. I.e. renderProtoView.transitiveNgContentCount > 0.
+  var protoView = new AppProtoView(renderProtoView.type,
+      renderProtoView.transitiveNgContentCount > 0, renderProtoView.render,
+      protoChangeDetector, variableBindings,
+      createVariableLocations(elementBinders),
+      renderProtoView.textBindings.length);
   _createElementBinders(protoView, elementBinders, allDirectives);
   _bindDirectiveEvents(protoView, elementBinders);
   return protoView;

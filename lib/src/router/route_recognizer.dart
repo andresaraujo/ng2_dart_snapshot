@@ -14,8 +14,12 @@ import "package:angular2/src/facade/collection.dart"
     show Map, MapWrapper, List, ListWrapper, Map, StringMapWrapper;
 import "path_recognizer.dart" show PathRecognizer;
 import "route_handler.dart" show RouteHandler;
+import "route_config_impl.dart"
+    show Route, AsyncRoute, Redirect, RouteDefinition;
 import "async_route_handler.dart" show AsyncRouteHandler;
 import "sync_route_handler.dart" show SyncRouteHandler;
+import "package:angular2/src/router/helpers.dart"
+    show parseAndAssignParamString;
 
 /**
  * `RouteRecognizer` is responsible for recognizing routes for a single component.
@@ -23,27 +27,32 @@ import "sync_route_handler.dart" show SyncRouteHandler;
  * components.
  */
 class RouteRecognizer {
+  bool isRoot;
   Map<String, PathRecognizer> names = new Map();
   Map<String, String> redirects = new Map();
   Map<RegExp, PathRecognizer> matchers = new Map();
-  void addRedirect(String path, String target) {
-    if (path == "/") {
-      path = "";
+  RouteRecognizer([this.isRoot = false]) {}
+  bool config(RouteDefinition config) {
+    var handler;
+    if (config is Redirect) {
+      var path = config.path == "/" ? "" : config.path;
+      this.redirects[path] = config.redirectTo;
+      return true;
+    } else if (config is Route) {
+      handler = new SyncRouteHandler(config.component);
+    } else if (config is AsyncRoute) {
+      handler = new AsyncRouteHandler(config.loader);
     }
-    this.redirects[path] = target;
-  }
-  bool addConfig(String path, dynamic handlerObj, [String alias = null]) {
-    var handler = configObjToHandler(handlerObj["component"]);
-    var recognizer = new PathRecognizer(path, handler);
+    var recognizer = new PathRecognizer(config.path, handler, this.isRoot);
     MapWrapper.forEach(this.matchers, (matcher, _) {
       if (recognizer.regex.toString() == matcher.regex.toString()) {
         throw new BaseException(
-            '''Configuration \'${ path}\' conflicts with existing route \'${ matcher . path}\'''');
+            '''Configuration \'${ config . path}\' conflicts with existing route \'${ matcher . path}\'''');
       }
     });
     this.matchers[recognizer.regex] = recognizer;
-    if (isPresent(alias)) {
-      this.names[alias] = recognizer;
+    if (isPresent(config.as)) {
+      this.names[config.as] = recognizer;
     }
     return recognizer.terminal;
   }
@@ -66,6 +75,16 @@ class RouteRecognizer {
         url = target + url.substring(path.length);
       }
     });
+    var queryParams = StringMapWrapper.create();
+    var queryString = "";
+    var queryIndex = url.indexOf("?");
+    if (queryIndex >= 0) {
+      queryString = url.substring(queryIndex + 1);
+      url = url.substring(0, queryIndex);
+    }
+    if (this.isRoot && queryString.length > 0) {
+      parseAndAssignParamString("&", queryString, queryParams);
+    }
     MapWrapper.forEach(this.matchers, (pathRecognizer, regex) {
       var match;
       if (isPresent(match = RegExpWrapper.firstMatch(regex, url))) {
@@ -75,7 +94,13 @@ class RouteRecognizer {
           matchedUrl = match[0];
           unmatchedUrl = url.substring(match[0].length);
         }
-        solutions.add(new RouteMatch(pathRecognizer, matchedUrl, unmatchedUrl));
+        var params = null;
+        if (pathRecognizer.terminal && !StringMapWrapper.isEmpty(queryParams)) {
+          params = queryParams;
+          matchedUrl += "?" + queryString;
+        }
+        solutions.add(
+            new RouteMatch(pathRecognizer, matchedUrl, unmatchedUrl, params));
       }
     });
     return solutions;
@@ -96,9 +121,21 @@ class RouteMatch {
   PathRecognizer recognizer;
   String matchedUrl;
   String unmatchedUrl;
-  RouteMatch(this.recognizer, this.matchedUrl, this.unmatchedUrl) {}
-  Map<String, String> params() {
-    return this.recognizer.parseParams(this.matchedUrl);
+  Map<String, dynamic> _params;
+  bool _paramsParsed = false;
+  RouteMatch(this.recognizer, this.matchedUrl, this.unmatchedUrl,
+      [Map<String, dynamic> p = null]) {
+    this._params = isPresent(p) ? p : StringMapWrapper.create();
+  }
+  Map<String, dynamic> params() {
+    if (!this._paramsParsed) {
+      this._paramsParsed = true;
+      StringMapWrapper.forEach(this.recognizer.parseParams(this.matchedUrl),
+          (value, key) {
+        StringMapWrapper.set(this._params, key, value);
+      });
+    }
+    return this._params;
   }
 }
 RouteHandler configObjToHandler(dynamic config) {

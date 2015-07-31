@@ -3,6 +3,8 @@ library angular2.src.di.exceptions;
 import "package:angular2/src/facade/collection.dart" show ListWrapper, List;
 import "package:angular2/src/facade/lang.dart"
     show stringify, BaseException, isBlank;
+import "key.dart" show Key;
+import "injector.dart" show Injector;
 
 List<dynamic> findFirstClosedCycle(List<dynamic> keys) {
   var res = [];
@@ -31,21 +33,26 @@ String constructResolvingPath(List<dynamic> keys) {
 class AbstractBindingError extends BaseException {
   String name;
   String message;
-  List<dynamic> keys;
+  List<Key> keys;
+  List<Injector> injectors;
   Function constructResolvingMessage;
-  // TODO(tbosch): Can't do key:Key as this results in a circular dependency!
-  AbstractBindingError(key, Function constructResolvingMessage,
+  AbstractBindingError(
+      Injector injector, Key key, Function constructResolvingMessage,
       [originalException, originalStack])
-      : super(null, originalException, originalStack) {
+      : super("DI Exception", originalException, originalStack, null) {
     /* super call moved to initializer */;
     this.keys = [key];
+    this.injectors = [injector];
     this.constructResolvingMessage = constructResolvingMessage;
     this.message = this.constructResolvingMessage(this.keys);
   }
-  // TODO(tbosch): Can't do key:Key as this results in a circular dependency!
-  void addKey(key) {
+  void addKey(Injector injector, Key key) {
+    this.injectors.add(injector);
     this.keys.add(key);
     this.message = this.constructResolvingMessage(this.keys);
+  }
+  get context {
+    return this.injectors[this.injectors.length - 1].debugContext();
   }
   String toString() {
     return this.message;
@@ -56,41 +63,10 @@ class AbstractBindingError extends BaseException {
  * {@link Injector} does not have a {@link Binding} for {@link Key}.
  */
 class NoBindingError extends AbstractBindingError {
-  // TODO(tbosch): Can't do key:Key as this results in a circular dependency!
-  NoBindingError(key) : super(key, (List<dynamic> keys) {
+  NoBindingError(Injector injector, Key key) : super(injector, key,
+          (List<dynamic> keys) {
         var first = stringify(ListWrapper.first(keys).token);
         return '''No provider for ${ first}!${ constructResolvingPath ( keys )}''';
-      }) {
-    /* super call moved to initializer */;
-  }
-}
-/**
- * Thrown when trying to retrieve an async {@link Binding} using the sync API.
- *
- * ## Example
- *
- * ```javascript
- * var injector = Injector.resolveAndCreate([
- *   bind(Number).toAsyncFactory(() => {
- *     return new Promise((resolve) => resolve(1 + 2));
- *   }),
- *   bind(String).toFactory((v) => { return "Value: " + v; }, [String])
- * ]);
- *
- * injector.asyncGet(String).then((v) => expect(v).toBe('Value: 3'));
- * expect(() => {
- *   injector.get(String);
- * }).toThrowError(AsycBindingError);
- * ```
- *
- * The above example throws because `String` depends on `Number` which is async. If any binding in
- * the dependency graph is async then the graph can only be retrieved using the `asyncGet` API.
- */
-class AsyncBindingError extends AbstractBindingError {
-  // TODO(tbosch): Can't do key:Key as this results in a circular dependency!
-  AsyncBindingError(key) : super(key, (List<dynamic> keys) {
-        var first = stringify(ListWrapper.first(keys).token);
-        return '''Cannot instantiate ${ first} synchronously. It is provided as a promise!${ constructResolvingPath ( keys )}''';
       }) {
     /* super call moved to initializer */;
   }
@@ -112,8 +88,8 @@ class AsyncBindingError extends AbstractBindingError {
  * Retrieving `A` or `B` throws a `CyclicDependencyError` as the graph above cannot be constructed.
  */
 class CyclicDependencyError extends AbstractBindingError {
-  // TODO(tbosch): Can't do key:Key as this results in a circular dependency!
-  CyclicDependencyError(key) : super(key, (List<dynamic> keys) {
+  CyclicDependencyError(Injector injector, Key key) : super(injector, key,
+          (List<dynamic> keys) {
         return '''Cannot instantiate cyclic dependency!${ constructResolvingPath ( keys )}''';
       }) {
     /* super call moved to initializer */;
@@ -126,16 +102,12 @@ class CyclicDependencyError extends AbstractBindingError {
  * this object to be instantiated.
  */
 class InstantiationError extends AbstractBindingError {
-  var causeKey;
-  // TODO(tbosch): Can't do key:Key as this results in a circular dependency!
-  InstantiationError(originalException, originalStack, key) : super(key,
-          (List<dynamic> keys) {
+  Key causeKey;
+  InstantiationError(
+      Injector injector, originalException, originalStack, Key key)
+      : super(injector, key, (List<dynamic> keys) {
         var first = stringify(ListWrapper.first(keys).token);
-        return '''Error during instantiation of ${ first}!${ constructResolvingPath ( keys )}.''' +
-            ''' ORIGINAL ERROR: ${ originalException}''' +
-            '''
-
- ORIGINAL STACK: ${ originalStack}''';
+        return '''Error during instantiation of ${ first}!${ constructResolvingPath ( keys )}.''';
       }, originalException, originalStack) {
     /* super call moved to initializer */;
     this.causeKey = key;

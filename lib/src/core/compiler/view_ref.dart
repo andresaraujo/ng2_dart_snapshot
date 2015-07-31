@@ -2,7 +2,8 @@ library angular2.src.core.compiler.view_ref;
 
 import "package:angular2/src/facade/lang.dart" show isPresent;
 import "view.dart" as viewModule;
-import "package:angular2/src/render/api.dart" show RenderViewRef;
+import "package:angular2/src/render/api.dart"
+    show RenderViewRef, RenderFragmentRef;
 
 // This is a workaround for privacy in Dart as we don't have library parts
 viewModule.AppView internalView(ViewRef viewRef) {
@@ -12,6 +13,7 @@ viewModule.AppView internalView(ViewRef viewRef) {
 viewModule.AppProtoView internalProtoView(ProtoViewRef protoViewRef) {
   return isPresent(protoViewRef) ? protoViewRef._protoView : null;
 }
+abstract class HostViewRef {}
 /**
  * A reference to an Angular View.
  *
@@ -53,29 +55,39 @@ viewModule.AppProtoView internalProtoView(ProtoViewRef protoViewRef) {
  * The outter/inner {@link ProtoViewRef}s are then assembled into views like so:
  *
  * ```
- * <!-- ViewRef: outter-0 -->
+ * <!-- ViewRef: outer-0 -->
  * Count: 2
  * <ul>
  *   <template view-container-ref></template>
  *   <!-- ViewRef: inner-1 --><li>first</li><!-- /ViewRef: inner-1 -->
  *   <!-- ViewRef: inner-2 --><li>second</li><!-- /ViewRef: inner-2 -->
  * </ul>
- * <!-- /ViewRef: outter-0 -->
+ * <!-- /ViewRef: outer-0 -->
  * ```
  */
-class ViewRef {
+class ViewRef implements HostViewRef {
   viewModule.AppView _view;
+  /**
+   * @private
+   */
   ViewRef(this._view) {}
   /**
-   * Return {@link RenderViewRef}
+   * Return `RenderViewRef`
    */
   RenderViewRef get render {
     return this._view.render;
   }
   /**
-   * Set local variable for a view.
+   * Return `RenderFragmentRef`
+   */
+  RenderFragmentRef get renderFragment {
+    return this._view.renderFragment;
+  }
+  /**
+   * Set local variable in a view.
    *
-   *
+   * - `contextName` - Name of the local variable in a view.
+   * - `value` - Value for the local variable in a view.
    */
   void setLocal(String contextName, dynamic value) {
     this._view.setLocal(contextName, value);

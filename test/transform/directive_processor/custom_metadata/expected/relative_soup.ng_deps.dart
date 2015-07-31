@@ -1,16 +1,15 @@
 library dinner.relative_soup.ng_deps.dart;
 
 import 'relative_soup.dart';
+export 'relative_soup.dart';
+import 'package:angular2/src/reflection/reflection.dart' as _ngRef;
 import 'annotations/soup.dart';
 
 var _visited = false;
-void initReflector(reflector) {
+void initReflector() {
   if (_visited) return;
   _visited = true;
-  reflector
-    ..registerType(RelativeSoup, {
-      'factory': () => new RelativeSoup(),
-      'parameters': const [],
-      'annotations': const [const Soup()]
-    });
+  _ngRef.reflector
+    ..registerType(RelativeSoup, new _ngRef.ReflectionInfo(
+        const [const Soup()], const [], () => new RelativeSoup()));
 }

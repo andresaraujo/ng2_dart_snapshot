@@ -26,7 +26,7 @@ class Locals {
     }
     throw new BaseException('''Cannot find \'${ name}\'''');
   }
-  void set(String name, value) {
+  void set(String name, dynamic value) {
     // TODO(rado): consider removing this check if we can guarantee this is not
 
     // exposed to the public API.

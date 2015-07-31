@@ -20,6 +20,13 @@ main() {
       }
       expect(indexes).toEqual([1, 4, 8, 9]);
     });
+    it("should reset before it is reused", () {
+      var re = new RegExp(r'^[' + "'" + r'"]');
+      var str = "'";
+      expect(RegExpWrapper.test(re, str)).toEqual(true);
+      // If not reset, the second attempt to test results in false
+      expect(RegExpWrapper.test(re, str)).toEqual(true);
+    });
   });
   describe("const", () {
     it("should support const expressions both in TS and Dart", () {

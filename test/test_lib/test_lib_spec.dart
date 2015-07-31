@@ -27,7 +27,7 @@ class TestObj {
     return a;
   }
 }
-@proxy
+@proxy()
 class SpyTestObj extends SpyObject implements TestObj {
   SpyTestObj() : super(TestObj) {
     /* super call moved to initializer */;

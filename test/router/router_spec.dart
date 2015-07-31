@@ -22,7 +22,7 @@ import "package:angular2/src/mock/location_mock.dart" show SpyLocation;
 import "package:angular2/src/router/location.dart" show Location;
 import "package:angular2/src/router/route_registry.dart" show RouteRegistry;
 import "package:angular2/src/router/route_config_decorator.dart"
-    show RouteConfig;
+    show RouteConfig, Route;
 import "package:angular2/src/core/compiler/directive_resolver.dart"
     show DirectiveResolver;
 import "package:angular2/di.dart" show bind;
@@ -47,7 +47,7 @@ main() {
         [AsyncTestCompleter], (async) {
       var outlet = makeDummyOutlet();
       router
-          .config({"path": "/", "component": DummyComponent})
+          .config([new Route(path: "/", component: DummyComponent)])
           .then((_) => router.registerOutlet(outlet))
           .then((_) {
         expect(outlet.spy("commit")).toHaveBeenCalled();
@@ -60,8 +60,8 @@ main() {
       var outlet = makeDummyOutlet();
       router
           .registerOutlet(outlet)
-          .then(
-              (_) => router.config({"path": "/a", "component": DummyComponent}))
+          .then((_) =>
+              router.config([new Route(path: "/a", component: DummyComponent)]))
           .then((_) => router.navigate("/a"))
           .then((_) {
         expect(outlet.spy("commit")).toHaveBeenCalled();
@@ -77,7 +77,8 @@ main() {
           .then((_) => router.navigate("/a"))
           .then((_) {
         expect(outlet.spy("commit")).not.toHaveBeenCalled();
-        return router.config({"path": "/a", "component": DummyComponent});
+        return router
+            .config([new Route(path: "/a", component: DummyComponent)]);
       }).then((_) {
         expect(outlet.spy("commit")).toHaveBeenCalled();
         async.done();
@@ -96,25 +97,48 @@ main() {
     });
     it("should generate URLs from the root component when the path starts with /",
         () {
-      router.config({
-        "path": "/first/...",
-        "component": DummyParentComp,
-        "as": "firstCmp"
-      });
+      router.config([
+        new Route(
+            path: "/first/...", component: DummyParentComp, as: "firstCmp")
+      ]);
       expect(router.generate(["/firstCmp", "secondCmp"]))
           .toEqual("/first/second");
       expect(router.generate(["/firstCmp", "secondCmp"]))
           .toEqual("/first/second");
       expect(router.generate(["/firstCmp/secondCmp"])).toEqual("/first/second");
     });
+    describe("querstring params", () {
+      it("should only apply querystring params if the given URL is on the root router and is terminal",
+          () {
+        router.config([
+          new Route(
+              path: "/hi/how/are/you",
+              component: DummyComponent,
+              as: "greeting-url")
+        ]);
+        var path = router.generate(["/greeting-url", {"name": "brad"}]);
+        expect(path).toEqual("/hi/how/are/you?name=brad");
+      });
+      it("should use parameters that are not apart of the route definition as querystring params",
+          () {
+        router.config([
+          new Route(
+              path: "/one/two/:three",
+              component: DummyComponent,
+              as: "number-url")
+        ]);
+        var path = router
+            .generate(["/number-url", {"three": "three", "four": "four"}]);
+        expect(path).toEqual("/one/two/three?four=four");
+      });
+    });
     describe("matrix params", () {
       it("should apply inline matrix params for each router path within the generated URL",
           () {
-        router.config({
-          "path": "/first/...",
-          "component": DummyParentComp,
-          "as": "firstCmp"
-        });
+        router.config([
+          new Route(
+              path: "/first/...", component: DummyParentComp, as: "firstCmp")
+        ]);
         var path = router.generate([
           "/firstCmp",
           {"key": "value"},
@@ -125,11 +149,12 @@ main() {
       });
       it("should apply inline matrix params for each router path within the generated URL and also include named params",
           () {
-        router.config({
-          "path": "/first/:token/...",
-          "component": DummyParentComp,
-          "as": "firstCmp"
-        });
+        router.config([
+          new Route(
+              path: "/first/:token/...",
+              component: DummyParentComp,
+              as: "firstCmp")
+        ]);
         var path = router.generate(
             ["/firstCmp", {"token": "min"}, "secondCmp", {"author": "max"}]);
         expect(path).toEqual("/first/min/second;author=max");
@@ -137,7 +162,7 @@ main() {
     });
   });
 }
-@proxy
+@proxy()
 class DummyOutlet extends SpyObject implements RouterOutlet {
   noSuchMethod(m) {
     return super.noSuchMethod(m);
@@ -145,7 +170,7 @@ class DummyOutlet extends SpyObject implements RouterOutlet {
 }
 class DummyComponent {}
 @RouteConfig(const [
-  const {"path": "/second", "component": DummyComponent, "as": "secondCmp"}
+  const Route(path: "/second", component: DummyComponent, as: "secondCmp")
 ])
 class DummyParentComp {}
 makeDummyOutlet() {

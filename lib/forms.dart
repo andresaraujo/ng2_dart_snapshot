@@ -33,7 +33,7 @@ export "src/forms/directives/default_value_accessor.dart"
 export "src/forms/directives/checkbox_value_accessor.dart"
     show CheckboxControlValueAccessor;
 export "src/forms/directives/select_control_value_accessor.dart"
-    show SelectControlValueAccessor;
+    show NgSelectOption, SelectControlValueAccessor;
 export "src/forms/directives.dart" show formDirectives;
 export "src/forms/validators.dart" show Validators;
 export "src/forms/directives/validators.dart"

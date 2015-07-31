@@ -3,7 +3,7 @@ library angular2.src.forms.directives.ng_form_model;
 import "package:angular2/src/facade/collection.dart" show List, ListWrapper;
 import "package:angular2/src/facade/async.dart"
     show ObservableWrapper, EventEmitter;
-import "package:angular2/angular2.dart" show Directive, LifecycleEvent;
+import "package:angular2/annotations.dart" show Directive, LifecycleEvent;
 import "package:angular2/di.dart" show Binding;
 import "ng_control.dart" show NgControl;
 import "ng_control_group.dart" show NgControlGroup;
@@ -82,7 +82,7 @@ const formDirectiveBinding =
  */
 @Directive(
     selector: "[ng-form-model]",
-    hostInjector: const [formDirectiveBinding],
+    bindings: const [formDirectiveBinding],
     properties: const ["form: ng-form-model"],
     lifecycle: const [LifecycleEvent.onChange],
     host: const {"(submit)": "onSubmit()"},

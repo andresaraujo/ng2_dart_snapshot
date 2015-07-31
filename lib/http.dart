@@ -18,14 +18,15 @@ import "package:angular2/src/http/backends/browser_jsonp.dart"
 import "package:angular2/src/http/base_request_options.dart"
     show BaseRequestOptions, RequestOptions;
 import "package:angular2/src/http/interfaces.dart" show ConnectionBackend;
+import "package:angular2/src/http/base_response_options.dart"
+    show BaseResponseOptions, ResponseOptions;
 export "package:angular2/src/http/backends/mock_backend.dart"
     show MockConnection, MockBackend;
 export "package:angular2/src/http/static_request.dart" show Request;
 export "package:angular2/src/http/static_response.dart" show Response;
-import "package:angular2/src/http/base_response_options.dart"
-    show BaseResponseOptions, ResponseOptions;
 export "package:angular2/src/http/interfaces.dart"
     show IRequestOptions, IResponseOptions, Connection, ConnectionBackend;
+export "package:angular2/src/http/backends/browser_xhr.dart" show BrowserXhr;
 export "package:angular2/src/http/base_request_options.dart"
     show BaseRequestOptions, RequestOptions;
 export "package:angular2/src/http/base_response_options.dart"
@@ -53,7 +54,7 @@ export "package:angular2/src/http/url_search_params.dart" show URLSearchParams;
  *
  * ```
  * import {httpInjectables, Http} from 'angular2/http';
- * @Component({selector: 'http-app', viewInjector: [httpInjectables]})
+ * @Component({selector: 'http-app', viewBindings: [httpInjectables]})
  * @View({template: '{{data}}'})
  * class MyApp {
  *   constructor(http:Http) {

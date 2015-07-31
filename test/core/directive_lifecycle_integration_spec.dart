@@ -14,7 +14,6 @@ import "package:angular2/test_lib.dart"
         xit,
         TestComponentBuilder,
         IS_DARTIUM;
-import "package:angular2/src/facade/collection.dart" show ListWrapper;
 import "package:angular2/angular2.dart"
     show Directive, Component, View, LifecycleEvent;
 import "package:angular2/src/core/annotations_impl/view.dart" as viewAnn;

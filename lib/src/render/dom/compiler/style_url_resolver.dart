@@ -4,7 +4,8 @@
 library angular2.src.render.dom.compiler.style_url_resolver;
 
 import "package:angular2/di.dart" show Injectable;
-import "package:angular2/src/facade/lang.dart" show RegExp, StringWrapper;
+import "package:angular2/src/facade/lang.dart"
+    show RegExp, RegExpWrapper, StringWrapper;
 import "package:angular2/src/services/url_resolver.dart" show UrlResolver;
 
 /**
@@ -22,7 +23,12 @@ class StyleUrlResolver {
   _replaceUrls(String cssText, RegExp re, String baseUrl) {
     return StringWrapper.replaceAllMapped(cssText, re, (m) {
       var pre = m[1];
-      var url = StringWrapper.replaceAll(m[2], _quoteRe, "");
+      var originalUrl = m[2];
+      if (RegExpWrapper.test(_dataUrlRe, originalUrl)) {
+        // Do not attempt to resolve data: URLs
+        return m[0];
+      }
+      var url = StringWrapper.replaceAll(originalUrl, _quoteRe, "");
       var post = m[3];
       var resolvedUrl = this._resolver.resolve(baseUrl, url);
       return pre + "'" + resolvedUrl + "'" + post;
@@ -38,3 +44,4 @@ var _cssImportRe = new RegExp(r'(@import[\s]+(?!url\())[' +
     "'" +
     r'"](.*;)');
 var _quoteRe = new RegExp(r'[' + "'" + r'"]');
+var _dataUrlRe = new RegExp(r'^[' + "'" + r'"]?data:');

@@ -8,7 +8,7 @@ import "../change_detector_ref.dart" show ChangeDetectorRef;
 import "pipe.dart" show WrappedValue, BasePipe, Pipe, PipeFactory;
 
 class KeyValueChangesFactory implements PipeFactory {
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return KeyValueChanges.supportsObj(obj);
   }
   Pipe create(ChangeDetectorRef cdRef) {
@@ -26,13 +26,13 @@ class KeyValueChanges extends BasePipe {
   KVChangeRecord _additionsTail = null;
   KVChangeRecord _removalsHead = null;
   KVChangeRecord _removalsTail = null;
-  static bool supportsObj(obj) {
+  static bool supportsObj(dynamic obj) {
     return obj is Map || isJsObject(obj);
   }
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return KeyValueChanges.supportsObj(obj);
   }
-  dynamic transform(map, [List<dynamic> args = null]) {
+  dynamic transform(Map<dynamic, dynamic> map, [List<dynamic> args = null]) {
     if (this.check(map)) {
       return WrappedValue.wrap(this);
     } else {
@@ -84,7 +84,7 @@ class KeyValueChanges extends BasePipe {
       fn(record);
     }
   }
-  bool check(map) {
+  bool check(Map<dynamic, dynamic> map) {
     this._reset();
     var records = this._records;
     KVChangeRecord oldSeqRecord = this._mapHead;

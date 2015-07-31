@@ -19,7 +19,6 @@ import "package:angular2/test_lib.dart"
         proxy,
         SpyObject,
         By;
-import "package:angular2/src/facade/lang.dart" show print;
 import "package:angular2/angular2.dart" show bind, Component, View;
 import "package:angular2/router.dart" show Location, Router, RouterLink;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
@@ -62,7 +61,7 @@ main() {
       <a [router-link]="[\'/detail\']">detail view</a>
     </div>''', directives: const [RouterLink])
 class TestComponent {}
-@proxy
+@proxy()
 class DummyLocation extends SpyObject implements Location {
   noSuchMethod(m) {
     return super.noSuchMethod(m);
@@ -73,7 +72,7 @@ makeDummyLocation() {
   dl.spy("normalizeAbsolutely").andCallFake((url) => url);
   return dl;
 }
-@proxy
+@proxy()
 class DummyRouter extends SpyObject implements Router {
   noSuchMethod(m) {
     return super.noSuchMethod(m);

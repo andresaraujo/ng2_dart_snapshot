@@ -36,7 +36,7 @@ import "package:angular2/src/facade/collection.dart"
  */
 @Directive(
     selector: "[class]",
-    lifecycle: const [LifecycleEvent.onCheck],
+    lifecycle: const [LifecycleEvent.onCheck, LifecycleEvent.onDestroy],
     properties: const ["rawClass: class"])
 class CSSClass {
   Pipes _pipes;
@@ -63,6 +63,9 @@ class CSSClass {
         this._applyObjectChanges(diff.wrapped);
       }
     }
+  }
+  void onDestroy() {
+    this._cleanupClasses(this._rawClass);
   }
   void _cleanupClasses(rawClassVal) {
     if (isPresent(rawClassVal)) {

@@ -19,6 +19,7 @@ import "instruction.dart" show Instruction;
 import "router_outlet.dart" show RouterOutlet;
 import "location.dart" show Location;
 import "route_lifecycle_reflector.dart" show getCanActivateHook;
+import "route_config_impl.dart" show RouteDefinition;
 
 var _resolveToTrue = PromiseWrapper.resolve(true);
 var _resolveToFalse = PromiseWrapper.resolve(false);
@@ -79,27 +80,17 @@ class Router {
    * # Usage
    *
    * ```
-   * router.config({ 'path': '/', 'component': IndexCmp});
-   * ```
-   *
-   * Or:
-   *
-   * ```
    * router.config([
    *   { 'path': '/', 'component': IndexComp },
    *   { 'path': '/user/:id', 'component': UserComp },
    * ]);
    * ```
    */
-  Future<dynamic> config(
-      dynamic /* Map < String , dynamic > | List < Map < String , dynamic > > */ config) {
-    if (isArray(config)) {
-      ((config as List<dynamic>)).forEach((configObject) {
-        this.registry.config(this.hostComponent, configObject);
-      });
-    } else {
-      this.registry.config(this.hostComponent, config);
-    }
+  Future<dynamic> config(List<RouteDefinition> definitions) {
+    definitions.forEach((routeDefinition) {
+      this.registry.config(
+          this.hostComponent, routeDefinition, this is RootRouter);
+    });
     return this.renavigate();
   }
   /**
@@ -201,7 +192,7 @@ class Router {
   /**
    * Subscribe to URL updates from the router
    */
-  void subscribe(onNext) {
+  void subscribe(dynamic /* (value: any) => void */ onNext) {
     ObservableWrapper.subscribe(this._subject, onNext);
   }
   /**
@@ -283,10 +274,10 @@ class RootRouter extends Router {
     /* super call moved to initializer */;
     this._location = location;
     this._location.subscribe((change) => this.navigate(change["url"]));
-    this.registry.configFromComponent(hostComponent);
+    this.registry.configFromComponent(hostComponent, true);
     this.navigate(location.path());
   }
-  Future<dynamic> commit(instruction) {
+  Future<dynamic> commit(Instruction instruction) {
     return super.commit(instruction).then((_) {
       this._location.go(instruction.accumulatedUrl);
     });

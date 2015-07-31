@@ -3,6 +3,7 @@ library angular2.src.forms.directives.checkbox_value_accessor;
 import "package:angular2/render.dart" show Renderer;
 import "package:angular2/annotations.dart" show Directive;
 import "package:angular2/core.dart" show ElementRef;
+import "package:angular2/di.dart" show Self;
 import "ng_control.dart" show NgControl;
 import "control_value_accessor.dart" show ControlValueAccessor;
 import "package:angular2/src/facade/lang.dart" show isPresent;
@@ -21,7 +22,6 @@ import "shared.dart" show setProperty;
     host: const {
   "(change)": "onChange(\$event.target.checked)",
   "(blur)": "onTouched()",
-  "[checked]": "checked",
   "[class.ng-untouched]": "ngClassUntouched",
   "[class.ng-touched]": "ngClassTouched",
   "[class.ng-pristine]": "ngClassPristine",
@@ -30,20 +30,17 @@ import "shared.dart" show setProperty;
   "[class.ng-invalid]": "ngClassInvalid"
 })
 class CheckboxControlValueAccessor implements ControlValueAccessor {
-  NgControl cd;
   Renderer renderer;
   ElementRef elementRef;
-  bool checked;
+  NgControl cd;
   var onChange = (_) {};
   var onTouched = () {};
-  CheckboxControlValueAccessor(this.cd, this.renderer, this.elementRef) {
+  CheckboxControlValueAccessor(
+      @Self() NgControl cd, this.renderer, this.elementRef) {
+    this.cd = cd;
     cd.valueAccessor = this;
   }
-  writeValue(value) {
-    // both this.checked and setProperty are required at the moment
-
-    // remove when a proper imperative API is provided
-    this.checked = value;
+  writeValue(dynamic value) {
     setProperty(this.renderer, this.elementRef, "checked", value);
   }
   bool get ngClassUntouched {
@@ -64,10 +61,10 @@ class CheckboxControlValueAccessor implements ControlValueAccessor {
   bool get ngClassInvalid {
     return isPresent(this.cd.control) ? !this.cd.control.valid : false;
   }
-  void registerOnChange(fn) {
+  void registerOnChange(dynamic /* (_: any) => {} */ fn) {
     this.onChange = fn;
   }
-  void registerOnTouched(fn) {
+  void registerOnTouched(dynamic /* () => {} */ fn) {
     this.onTouched = fn;
   }
 }

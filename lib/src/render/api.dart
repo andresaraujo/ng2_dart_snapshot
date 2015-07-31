@@ -5,7 +5,8 @@ import "package:angular2/src/facade/lang.dart"
 import "package:angular2/src/facade/async.dart" show Future;
 import "package:angular2/src/facade/collection.dart"
     show List, Map, MapWrapper, Map, StringMapWrapper;
-import "package:angular2/change_detection.dart" show ASTWithSource;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show ASTWithSource;
 
 /**
  * General notes:
@@ -51,11 +52,10 @@ class ElementBinder {
 
   // with a local name
   List<EventBinding> eventBindings;
-  List<ASTWithSource> textBindings;
   Map<String, String> readAttributes;
   ElementBinder({index, parentIndex, distanceToParent, directives,
       nestedProtoView, propertyBindings, variableBindings, eventBindings,
-      textBindings, readAttributes}) {
+      readAttributes}) {
     this.index = index;
     this.parentIndex = parentIndex;
     this.distanceToParent = distanceToParent;
@@ -64,7 +64,6 @@ class ElementBinder {
     this.propertyBindings = propertyBindings;
     this.variableBindings = variableBindings;
     this.eventBindings = eventBindings;
-    this.textBindings = textBindings;
     this.readAttributes = readAttributes;
   }
 }
@@ -106,11 +105,16 @@ class ProtoViewDto {
   List<ElementBinder> elementBinders;
   Map<String, String> variableBindings;
   ViewType type;
-  ProtoViewDto({render, elementBinders, variableBindings, type}) {
+  List<ASTWithSource> textBindings;
+  num transitiveNgContentCount;
+  ProtoViewDto({render, elementBinders, variableBindings, type, textBindings,
+      transitiveNgContentCount}) {
     this.render = render;
     this.elementBinders = elementBinders;
     this.variableBindings = variableBindings;
     this.type = type;
+    this.textBindings = textBindings;
+    this.transitiveNgContentCount = transitiveNgContentCount;
   }
 }
 class DirectiveMetadata {
@@ -212,10 +216,30 @@ class DirectiveMetadata {
         exportAs: exportAs);
   }
 }
-// An opaque reference to a DomProtoView
+// An opaque reference to a render proto ivew
 class RenderProtoViewRef {}
-// An opaque reference to a DomView
+// An opaque reference to a part of a view
+class RenderFragmentRef {}
+// An opaque reference to a view
 class RenderViewRef {}
+/**
+ * How the template and styles of a view should be encapsulated.
+ */
+enum ViewEncapsulation {
+  /**
+   * Emulate scoping of styles by preprocessing the style rules
+   * and adding additional attributes to elements. This is the default.
+   */
+  EMULATED,
+  /**
+   * Uses the native mechanism of the renderer. For the DOM this means creating a ShadowRoot.
+   */
+  NATIVE,
+  /**
+   * Don't scope the template nor the styles.
+   */
+  NONE
+}
 class ViewDefinition {
   String componentId;
   String templateAbsUrl;
@@ -223,15 +247,54 @@ class ViewDefinition {
   List<DirectiveMetadata> directives;
   List<String> styleAbsUrls;
   List<String> styles;
+  ViewEncapsulation encapsulation;
   ViewDefinition({componentId, templateAbsUrl, template, styleAbsUrls, styles,
-      directives}) {
+      directives, encapsulation}) {
     this.componentId = componentId;
     this.templateAbsUrl = templateAbsUrl;
     this.template = template;
     this.styleAbsUrls = styleAbsUrls;
     this.styles = styles;
     this.directives = directives;
+    this.encapsulation =
+        isPresent(encapsulation) ? encapsulation : ViewEncapsulation.EMULATED;
   }
+}
+class RenderProtoViewMergeMapping {
+  RenderProtoViewRef mergedProtoViewRef;
+  num fragmentCount;
+  List<num> mappedElementIndices;
+  num mappedElementCount;
+  List<num> mappedTextIndices;
+  List<num> hostElementIndicesByViewIndex;
+  List<num> nestedViewCountByViewIndex;
+  RenderProtoViewMergeMapping(this.mergedProtoViewRef,
+      // Number of fragments in the merged ProtoView.
+
+      // Fragments are stored in depth first order of nested ProtoViews.
+      this.fragmentCount,
+      // Mapping from app element index to render element index.
+
+      // Mappings of nested ProtoViews are in depth first order, with all
+
+      // indices for one ProtoView in a consecuitve block.
+      this.mappedElementIndices,
+      // Number of bound render element.
+
+      // Note: This could be more than the original ones
+
+      // as we might have bound a new element for projecting bound text nodes.
+      this.mappedElementCount,
+      // Mapping from app text index to render text index.
+
+      // Mappings of nested ProtoViews are in depth first order, with all
+
+      // indices for one ProtoView in a consecuitve block.
+      this.mappedTextIndices,
+      // Mapping from view index to app element index
+      this.hostElementIndicesByViewIndex,
+      // Number of contained views by view index
+      this.nestedViewCountByViewIndex) {}
 }
 class RenderCompiler {
   /**
@@ -248,41 +311,66 @@ class RenderCompiler {
   Future<ProtoViewDto> compile(ViewDefinition view) {
     return null;
   }
+  /**
+   * Merges ProtoViews.
+   * The first entry of the array is the protoview into which all the other entries of the array
+   * should be merged.
+   * If the array contains other arrays, they will be merged before processing the parent array.
+   * The array must contain an entry for every component and embedded ProtoView of the first entry.
+   * @param protoViewRefs List of ProtoViewRefs or nested
+   * @return the merge result
+   */
+  Future<RenderProtoViewMergeMapping> mergeProtoViewsRecursively(
+      List<dynamic /* RenderProtoViewRef | List < dynamic > */ > protoViewRefs) {
+    return null;
+  }
+}
+class RenderViewWithFragments {
+  RenderViewRef viewRef;
+  List<RenderFragmentRef> fragmentRefs;
+  RenderViewWithFragments(this.viewRef, this.fragmentRefs) {}
 }
 /**
- * Abstract reference to the element which can be marshaled across web-worker boundry.
+ * Abstract reference to the element which can be marshaled across web-worker boundary.
  *
- * This interface is used by the {@link Renderer} api.
+ * This interface is used by the Renderer API.
  */
 abstract class RenderElementRef {
   /**
-   * Reference to the {@link RenderViewRef} where the `RenderElementRef` is inside of.
+   * Reference to the `RenderViewRef` where the `RenderElementRef` is inside of.
    */
   RenderViewRef renderView;
   /**
-   * Index of the element inside the {@link ViewRef}.
+   * Index of the element inside the `RenderViewRef`.
    *
    * This is used internally by the Angular framework to locate elements.
    */
-  num boundElementIndex;
+  num renderBoundElementIndex;
 }
 class Renderer {
   /**
    * Creates a root host view that includes the given element.
+   * Note that the fragmentCount needs to be passed in so that we can create a result
+   * synchronously even when dealing with webworkers!
+   *
    * @param {RenderProtoViewRef} hostProtoViewRef a RenderProtoViewRef of type
    * ProtoViewDto.HOST_VIEW_TYPE
    * @param {any} hostElementSelector css selector for the host element (will be queried against the
    * main document)
-   * @return {RenderViewRef} the created view
+   * @return {RenderViewWithFragments} the created view including fragments
    */
-  RenderViewRef createRootHostView(
-      RenderProtoViewRef hostProtoViewRef, String hostElementSelector) {
+  RenderViewWithFragments createRootHostView(
+      RenderProtoViewRef hostProtoViewRef, num fragmentCount,
+      String hostElementSelector) {
     return null;
   }
   /**
-   * Creates a regular view out of the given ProtoView
+   * Creates a regular view out of the given ProtoView.
+   * Note that the fragmentCount needs to be passed in so that we can create a result
+   * synchronously even when dealing with webworkers!
    */
-  RenderViewRef createView(RenderProtoViewRef protoViewRef) {
+  RenderViewWithFragments createView(
+      RenderProtoViewRef protoViewRef, num fragmentCount) {
     return null;
   }
   /**
@@ -290,29 +378,19 @@ class Renderer {
    */
   destroyView(RenderViewRef viewRef) {}
   /**
-   * Attaches a componentView into the given hostView at the given element
+   * Attaches a fragment after another fragment.
    */
-  attachComponentView(
-      RenderElementRef location, RenderViewRef componentViewRef) {}
+  attachFragmentAfterFragment(
+      RenderFragmentRef previousFragmentRef, RenderFragmentRef fragmentRef) {}
   /**
-   * Detaches a componentView into the given hostView at the given element
+   * Attaches a fragment after an element.
    */
-  detachComponentView(
-      RenderElementRef location, RenderViewRef componentViewRef) {}
+  attachFragmentAfterElement(
+      RenderElementRef elementRef, RenderFragmentRef fragmentRef) {}
   /**
-   * Attaches a view into a ViewContainer (in the given parentView at the given element) at the
-   * given index.
+   * Detaches a fragment.
    */
-  attachViewInContainer(
-      RenderElementRef location, num atIndex, RenderViewRef viewRef) {}
-  /**
-   * Detaches a view into a ViewContainer (in the given parentView at the given element) at the
-   * given index.
-   */
-
-  // TODO(tbosch): this should return a promise as it can be animated!
-  detachViewInContainer(
-      RenderElementRef location, num atIndex, RenderViewRef viewRef) {}
+  detachFragment(RenderFragmentRef fragmentRef) {}
   /**
    * Hydrates a view after it has been attached. Hydration/dehydration is used for reusing views
    * inside of the view pool.
@@ -361,17 +439,17 @@ class Renderer {
   /**
    * Sets the dispatcher for all events of the given view
    */
-  setEventDispatcher(RenderViewRef viewRef, EventDispatcher dispatcher) {}
+  setEventDispatcher(RenderViewRef viewRef, RenderEventDispatcher dispatcher) {}
 }
 /**
  * A dispatcher for all events happening in a view.
  */
-abstract class EventDispatcher {
+abstract class RenderEventDispatcher {
   /**
    * Called when an event was triggered for a on-* attribute on an element.
    * @param {Map<string, any>} locals Locals to be used to evaluate the
    *   event expressions
    */
-  dispatchEvent(
+  dispatchRenderEvent(
       num elementIndex, String eventName, Map<String, dynamic> locals);
 }

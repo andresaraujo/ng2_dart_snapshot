@@ -1,16 +1,15 @@
 library dinner.package_soup.ng_deps.dart;
 
 import 'package_soup.dart';
+export 'package_soup.dart';
+import 'package:angular2/src/reflection/reflection.dart' as _ngRef;
 import 'package:soup/soup.dart';
 
 var _visited = false;
-void initReflector(reflector) {
+void initReflector() {
   if (_visited) return;
   _visited = true;
-  reflector
-    ..registerType(PackageSoup, {
-      'factory': () => new PackageSoup(),
-      'parameters': const [],
-      'annotations': const [const Soup()]
-    });
+  _ngRef.reflector
+    ..registerType(PackageSoup, new _ngRef.ReflectionInfo(
+        const [const Soup()], const [], () => new PackageSoup()));
 }

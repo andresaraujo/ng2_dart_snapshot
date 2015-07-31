@@ -7,13 +7,13 @@ import "package:angular2/src/facade/collection.dart"
 import "locals.dart" show Locals;
 
 class AST {
-  eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     throw new BaseException("Not supported");
   }
   bool get isAssignable {
     return false;
   }
-  assign(context, Locals locals, value) {
+  assign(dynamic context, Locals locals, dynamic value) {
     throw new BaseException("Not supported");
   }
   dynamic visit(AstVisitor visitor) {
@@ -24,13 +24,13 @@ class AST {
   }
 }
 class EmptyExpr extends AST {
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     return null;
   }
   visit(AstVisitor visitor) {}
 }
 class ImplicitReceiver extends AST {
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     return context;
   }
   dynamic visit(AstVisitor visitor) {
@@ -45,7 +45,7 @@ class Chain extends AST {
   Chain(this.expressions) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     var result;
     for (var i = 0; i < this.expressions.length; i++) {
       var last = this.expressions[i].eval(context, locals);
@@ -64,7 +64,7 @@ class Conditional extends AST {
   Conditional(this.condition, this.trueExp, this.falseExp) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     if (this.condition.eval(context, locals)) {
       return this.trueExp.eval(context, locals);
     } else {
@@ -82,7 +82,7 @@ class If extends AST {
   If(this.condition, this.trueExp, [this.falseExp]) : super() {
     /* super call moved to initializer */;
   }
-  eval(context, locals) {
+  eval(dynamic context, Locals locals) {
     if (this.condition.eval(context, locals)) {
       this.trueExp.eval(context, locals);
     } else if (isPresent(this.falseExp)) {
@@ -101,7 +101,7 @@ class AccessMember extends AST {
   AccessMember(this.receiver, this.name, this.getter, this.setter) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     if (this.receiver is ImplicitReceiver &&
         isPresent(locals) &&
         locals.contains(this.name)) {
@@ -114,7 +114,7 @@ class AccessMember extends AST {
   bool get isAssignable {
     return true;
   }
-  dynamic assign(context, Locals locals, value) {
+  dynamic assign(dynamic context, Locals locals, dynamic value) {
     var evaluatedContext = this.receiver.eval(context, locals);
     if (this.receiver is ImplicitReceiver &&
         isPresent(locals) &&
@@ -138,7 +138,7 @@ class SafeAccessMember extends AST {
       : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     var evaluatedReceiver = this.receiver.eval(context, locals);
     return isBlank(evaluatedReceiver) ? null : this.getter(evaluatedReceiver);
   }
@@ -152,7 +152,7 @@ class KeyedAccess extends AST {
   KeyedAccess(this.obj, this.key) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     dynamic obj = this.obj.eval(context, locals);
     dynamic key = this.key.eval(context, locals);
     return obj[key];
@@ -160,7 +160,7 @@ class KeyedAccess extends AST {
   bool get isAssignable {
     return true;
   }
-  dynamic assign(context, Locals locals, value) {
+  dynamic assign(dynamic context, Locals locals, dynamic value) {
     dynamic obj = this.obj.eval(context, locals);
     dynamic key = this.key.eval(context, locals);
     obj[key] = value;
@@ -186,7 +186,7 @@ class LiteralPrimitive extends AST {
   LiteralPrimitive(this.value) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     return this.value;
   }
   dynamic visit(AstVisitor visitor) {
@@ -198,7 +198,7 @@ class LiteralArray extends AST {
   LiteralArray(this.expressions) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     return ListWrapper.map(this.expressions, (e) => e.eval(context, locals));
   }
   dynamic visit(AstVisitor visitor) {
@@ -211,7 +211,7 @@ class LiteralMap extends AST {
   LiteralMap(this.keys, this.values) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     var res = StringMapWrapper.create();
     for (var i = 0; i < this.keys.length; ++i) {
       StringMapWrapper.set(
@@ -229,7 +229,7 @@ class Interpolation extends AST {
   Interpolation(this.strings, this.expressions) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, locals) {
+  dynamic eval(dynamic context, Locals locals) {
     throw new BaseException("evaluating an Interpolation is not supported");
   }
   visit(AstVisitor visitor) {
@@ -243,7 +243,7 @@ class Binary extends AST {
   Binary(this.operation, this.left, this.right) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     dynamic left = this.left.eval(context, locals);
     switch (this.operation) {
       case "&&":
@@ -295,7 +295,7 @@ class PrefixNot extends AST {
   PrefixNot(this.expression) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     return !this.expression.eval(context, locals);
   }
   dynamic visit(AstVisitor visitor) {
@@ -304,11 +304,11 @@ class PrefixNot extends AST {
 }
 class Assignment extends AST {
   AST target;
-  AST value;
+  dynamic value;
   Assignment(this.target, this.value) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     return this.target.assign(
         context, locals, this.value.eval(context, locals));
   }
@@ -324,7 +324,7 @@ class MethodCall extends AST {
   MethodCall(this.receiver, this.name, this.fn, this.args) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     var evaluatedArgs = evalList(context, locals, this.args);
     if (this.receiver is ImplicitReceiver &&
         isPresent(locals) &&
@@ -348,7 +348,7 @@ class SafeMethodCall extends AST {
   SafeMethodCall(this.receiver, this.name, this.fn, this.args) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     var evaluatedReceiver = this.receiver.eval(context, locals);
     if (isBlank(evaluatedReceiver)) return null;
     var evaluatedArgs = evalList(context, locals, this.args);
@@ -364,7 +364,7 @@ class FunctionCall extends AST {
   FunctionCall(this.target, this.args) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     dynamic obj = this.target.eval(context, locals);
     if (!(obj is Function)) {
       throw new BaseException('''${ obj} is not a function''');
@@ -382,13 +382,13 @@ class ASTWithSource extends AST {
   ASTWithSource(this.ast, this.source, this.location) : super() {
     /* super call moved to initializer */;
   }
-  dynamic eval(context, Locals locals) {
+  dynamic eval(dynamic context, Locals locals) {
     return this.ast.eval(context, locals);
   }
   bool get isAssignable {
     return this.ast.isAssignable;
   }
-  dynamic assign(context, Locals locals, value) {
+  dynamic assign(dynamic context, Locals locals, dynamic value) {
     return this.ast.assign(context, locals, value);
   }
   dynamic visit(AstVisitor visitor) {

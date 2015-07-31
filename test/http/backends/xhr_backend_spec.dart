@@ -19,6 +19,7 @@ import "package:angular2/src/http/backends/xhr_backend.dart"
     show XHRConnection, XHRBackend;
 import "package:angular2/di.dart" show bind, Injector;
 import "package:angular2/src/http/static_request.dart" show Request;
+import "package:angular2/src/http/static_response.dart" show Response;
 import "package:angular2/src/http/headers.dart" show Headers;
 import "package:angular2/src/facade/collection.dart" show Map;
 import "package:angular2/src/http/base_request_options.dart"
@@ -33,6 +34,7 @@ var openSpy;
 var setRequestHeaderSpy;
 var addEventListenerSpy;
 var existingXHRs = [];
+Response unused;
 class MockBrowserXHR extends BrowserXhr {
   dynamic abort;
   dynamic send;
@@ -90,6 +92,16 @@ main() {
             new ResponseOptions(type: ResponseTypes.Error));
         ObservableWrapper.subscribe(connection.response, (res) {
           expect(res.type).toBe(ResponseTypes.Error);
+          async.done();
+        });
+        existingXHRs[0].dispatchEvent("load");
+      }));
+      it("should complete a request", inject([AsyncTestCompleter], (async) {
+        var connection = new XHRConnection(sampleRequest, new MockBrowserXHR(),
+            new ResponseOptions(type: ResponseTypes.Error));
+        ObservableWrapper.subscribe(connection.response, (res) {
+          expect(res.type).toBe(ResponseTypes.Error);
+        }, null, () {
           async.done();
         });
         existingXHRs[0].dispatchEvent("load");

@@ -1,8 +1,9 @@
 library angular2.src.directives.ng_for;
 
-import "package:angular2/annotations.dart" show Directive;
-import "package:angular2/angular2.dart"
-    show ViewContainerRef, ViewRef, ProtoViewRef, Pipes, LifecycleEvent, Pipe;
+import "package:angular2/annotations.dart" show Directive, LifecycleEvent;
+import "package:angular2/core.dart" show ViewContainerRef, ViewRef, TemplateRef;
+import "package:angular2/change_detection.dart"
+    show ChangeDetectorRef, Pipe, Pipes;
 import "package:angular2/src/facade/lang.dart" show isPresent, isBlank;
 
 /**
@@ -41,14 +42,15 @@ import "package:angular2/src/facade/lang.dart" show isPresent, isBlank;
     lifecycle: const [LifecycleEvent.onCheck])
 class NgFor {
   ViewContainerRef viewContainer;
-  ProtoViewRef protoViewRef;
+  TemplateRef templateRef;
   Pipes pipes;
+  ChangeDetectorRef cdr;
   dynamic _ngForOf;
   Pipe _pipe;
-  NgFor(this.viewContainer, this.protoViewRef, this.pipes) {}
+  NgFor(this.viewContainer, this.templateRef, this.pipes, this.cdr) {}
   set ngForOf(dynamic value) {
     this._ngForOf = value;
-    this._pipe = this.pipes.get("iterableDiff", value, null, this._pipe);
+    this._pipe = this.pipes.get("iterableDiff", value, this.cdr, this._pipe);
   }
   onCheck() {
     var diff = this._pipe.transform(this._ngForOf, null);
@@ -70,7 +72,7 @@ class NgFor {
     var insertTuples = NgFor.bulkRemove(recordViewTuples, this.viewContainer);
     changes.forEachAddedItem((addedRecord) =>
         insertTuples.add(new RecordViewTuple(addedRecord, null)));
-    NgFor.bulkInsert(insertTuples, this.viewContainer, this.protoViewRef);
+    NgFor.bulkInsert(insertTuples, this.viewContainer, this.templateRef);
     for (var i = 0; i < insertTuples.length; i++) {
       this._perViewChange(insertTuples[i].view, insertTuples[i].record);
     }
@@ -96,15 +98,15 @@ class NgFor {
     return movedTuples;
   }
   static List<RecordViewTuple> bulkInsert(List<RecordViewTuple> tuples,
-      ViewContainerRef viewContainer, ProtoViewRef protoViewRef) {
+      ViewContainerRef viewContainer, TemplateRef templateRef) {
     tuples.sort((a, b) => a.record.currentIndex - b.record.currentIndex);
     for (var i = 0; i < tuples.length; i++) {
       var tuple = tuples[i];
       if (isPresent(tuple.view)) {
         viewContainer.insert(tuple.view, tuple.record.currentIndex);
       } else {
-        tuple.view =
-            viewContainer.create(protoViewRef, tuple.record.currentIndex);
+        tuple.view = viewContainer.createEmbeddedView(
+            templateRef, tuple.record.currentIndex);
       }
     }
     return tuples;

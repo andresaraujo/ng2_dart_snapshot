@@ -1,8 +1,9 @@
 library angular2.src.forms.directives.select_control_value_accessor;
 
 import "package:angular2/render.dart" show Renderer;
-import "package:angular2/angular2.dart"
-    show ElementRef, QueryList, Directive, Query;
+import "package:angular2/core.dart" show ElementRef, QueryList;
+import "package:angular2/di.dart" show Self;
+import "package:angular2/annotations.dart" show Query, Directive;
 import "ng_control.dart" show NgControl;
 import "control_value_accessor.dart" show ControlValueAccessor;
 import "package:angular2/src/facade/lang.dart" show isPresent;
@@ -12,11 +13,12 @@ import "shared.dart" show setProperty;
  * Marks <option> as dynamic, so Angular can be notified when options change.
  *
  * #Example:
+ *
  * ```
  * <select ng-control="city">
  *   <option *ng-for="#c of cities" [value]="c"></option>
  * </select>
- * ``
+ * ```
  */
 @Directive(selector: "option")
 class NgSelectOption {}
@@ -29,7 +31,6 @@ class NgSelectOption {}
   "(change)": "onChange(\$event.target.value)",
   "(input)": "onChange(\$event.target.value)",
   "(blur)": "onTouched()",
-  "[value]": "value",
   "[class.ng-untouched]": "ngClassUntouched",
   "[class.ng-touched]": "ngClassTouched",
   "[class.ng-pristine]": "ngClassPristine",
@@ -38,21 +39,20 @@ class NgSelectOption {}
   "[class.ng-invalid]": "ngClassInvalid"
 })
 class SelectControlValueAccessor implements ControlValueAccessor {
-  NgControl cd;
   Renderer renderer;
   ElementRef elementRef;
-  var value = "";
+  NgControl cd;
+  String value;
   var onChange = (_) {};
   var onTouched = () {};
-  SelectControlValueAccessor(this.cd, this.renderer, this.elementRef, @Query(
-      NgSelectOption, descendants: true) QueryList<NgSelectOption> query) {
+  SelectControlValueAccessor(@Self() NgControl cd, this.renderer,
+      this.elementRef, @Query(NgSelectOption,
+          descendants: true) QueryList<NgSelectOption> query) {
+    this.cd = cd;
     cd.valueAccessor = this;
     this._updateValueWhenListOfOptionsChanges(query);
   }
-  writeValue(value) {
-    // both this.value and setProperty are required at the moment
-
-    // remove when a proper imperative API is provided
+  writeValue(dynamic value) {
     this.value = value;
     setProperty(this.renderer, this.elementRef, "value", value);
   }
@@ -74,10 +74,10 @@ class SelectControlValueAccessor implements ControlValueAccessor {
   bool get ngClassInvalid {
     return isPresent(this.cd.control) ? !this.cd.control.valid : false;
   }
-  void registerOnChange(fn) {
+  void registerOnChange(dynamic /* () => any */ fn) {
     this.onChange = fn;
   }
-  void registerOnTouched(fn) {
+  void registerOnTouched(dynamic /* () => any */ fn) {
     this.onTouched = fn;
   }
   _updateValueWhenListOfOptionsChanges(QueryList<NgSelectOption> query) {

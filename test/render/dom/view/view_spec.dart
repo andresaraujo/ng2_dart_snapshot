@@ -21,10 +21,11 @@ import "package:angular2/src/facade/lang.dart" show isBlank;
 import "package:angular2/src/facade/collection.dart" show ListWrapper;
 import "package:angular2/src/render/dom/view/proto_view.dart" show DomProtoView;
 import "package:angular2/src/render/dom/view/element_binder.dart"
-    show ElementBinder;
+    show DomElementBinder;
 import "package:angular2/src/render/dom/view/view.dart" show DomView;
-import "package:angular2/src/render/dom/view/element.dart" show DomElement;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
+import "package:angular2/src/render/dom/template_cloner.dart"
+    show TemplateCloner;
 
 main() {
   describe("DomView", () {
@@ -32,53 +33,33 @@ main() {
       if (isBlank(binders)) {
         binders = [];
       }
-      var rootEl = el("<div></div>");
-      return new DomProtoView(
-          element: rootEl,
-          elementBinders: binders,
-          transitiveContentTagCount: 0,
-          boundTextNodeCount: 0);
+      var rootEl = DOM.createTemplate("<div></div>");
+      return DomProtoView.create(new TemplateCloner(-1), null,
+          (rootEl as dynamic), null, [1], [], binders, null);
+    }
+    createElementBinder() {
+      return new DomElementBinder(textNodeIndices: []);
     }
     createView([pv = null, boundElementCount = 0]) {
       if (isBlank(pv)) {
-        pv = createProtoView(ListWrapper.createFixedSize(boundElementCount));
+        var elementBinders = ListWrapper.createFixedSize(boundElementCount);
+        for (var i = 0; i < boundElementCount; i++) {
+          elementBinders[i] = createElementBinder();
+        }
+        pv = createProtoView(elementBinders);
       }
       var root = el("<div><div></div></div>");
       var boundElements = [];
       for (var i = 0; i < boundElementCount; i++) {
-        boundElements.add(
-            new DomElement(pv.elementBinders[i], el("<span></span"), null));
+        boundElements.add(el("<span></span"));
       }
-      return new DomView(pv, [DOM.childNodes(root)[0]], [], boundElements);
+      return new DomView(pv, [DOM.childNodes(root)[0]], boundElements);
     }
-    createElementBinder([num parentIndex = 0, num distanceToParent = 1]) {
-      return new ElementBinder(
-          parentIndex: parentIndex,
-          distanceToParent: distanceToParent,
-          textNodeIndices: []);
-    }
-    describe("getDirectParentElement", () {
-      it("should return the DomElement of the direct parent", () {
-        var pv =
-            createProtoView([createElementBinder(), createElementBinder(0, 1)]);
-        var view = createView(pv, 2);
-        expect(view.getDirectParentElement(1)).toBe(view.boundElements[0]);
-      });
-      it("should return null if the direct parent is not bound", () {
-        var pv = createProtoView([
-          createElementBinder(),
-          createElementBinder(),
-          createElementBinder(0, 2)
-        ]);
-        var view = createView(pv, 3);
-        expect(view.getDirectParentElement(2)).toBe(null);
-      });
-    });
     describe("setElementProperty", () {
       var el, view;
       beforeEach(() {
         view = createView(null, 1);
-        el = view.boundElements[0].element;
+        el = view.boundElements[0];
       });
       it("should update the property value", () {
         view.setElementProperty(0, "title", "Hello");
@@ -89,7 +70,7 @@ main() {
       var el, view;
       beforeEach(() {
         view = createView(null, 1);
-        el = view.boundElements[0].element;
+        el = view.boundElements[0];
       });
       it("should update and remove an attribute", () {
         view.setElementAttribute(0, "role", "button");
@@ -106,7 +87,7 @@ main() {
       var el, view;
       beforeEach(() {
         view = createView(null, 1);
-        el = view.boundElements[0].element;
+        el = view.boundElements[0];
       });
       it("should set and remove a class", () {
         view.setElementClass(0, "active", true);
@@ -114,10 +95,14 @@ main() {
         view.setElementClass(0, "active", false);
         expect(DOM.hasClass(el, "active")).toEqual(false);
       });
-      it("should de-normalize class names", () {
+      it("should not de-normalize class names", () {
         view.setElementClass(0, "veryActive", true);
+        view.setElementClass(0, "very-active", true);
+        expect(DOM.hasClass(el, "veryActive")).toEqual(true);
         expect(DOM.hasClass(el, "very-active")).toEqual(true);
         view.setElementClass(0, "veryActive", false);
+        view.setElementClass(0, "very-active", false);
+        expect(DOM.hasClass(el, "veryActive")).toEqual(false);
         expect(DOM.hasClass(el, "very-active")).toEqual(false);
       });
     });
@@ -125,7 +110,7 @@ main() {
       var el, view;
       beforeEach(() {
         view = createView(null, 1);
-        el = view.boundElements[0].element;
+        el = view.boundElements[0];
       });
       it("should set and remove styles", () {
         view.setElementStyle(0, "width", "40px");

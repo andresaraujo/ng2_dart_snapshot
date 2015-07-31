@@ -11,17 +11,13 @@ import "package:angular2/src/render/dom/compiler/directive_parser.dart"
     show DirectiveParser;
 import "package:angular2/src/render/dom/compiler/compile_pipeline.dart"
     show CompilePipeline;
-import "package:angular2/src/render/dom/compiler/compile_step.dart"
-    show CompileStep;
-import "package:angular2/src/render/dom/compiler/compile_element.dart"
-    show CompileElement;
-import "package:angular2/src/render/dom/compiler/compile_control.dart"
-    show CompileControl;
 import "package:angular2/src/render/api.dart"
-    show ViewDefinition, DirectiveMetadata;
-import "package:angular2/change_detection.dart" show Lexer, Parser;
+    show ViewDefinition, DirectiveMetadata, ViewType;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show Lexer, Parser;
 import "package:angular2/src/render/dom/view/proto_view_builder.dart"
     show ElementBinderBuilder;
+import "pipeline_spec.dart" show MockStep;
 
 main() {
   describe("DirectiveParser", () {
@@ -55,11 +51,15 @@ main() {
         new DirectiveParser(parser, directives)
       ]);
     }
+    ViewDefinition createViewDefinition() {
+      return new ViewDefinition(componentId: "someComponent");
+    }
     List<ElementBinderBuilder> process(el,
         [propertyBindings = null, directives = null]) {
       var pipeline = createPipeline(propertyBindings, directives);
-      return ListWrapper.map(
-          pipeline.process(el), (ce) => ce.inheritedElementBinder);
+      return ListWrapper.map(pipeline.processElements(
+              el, ViewType.COMPONENT, createViewDefinition()),
+          (ce) => ce.inheritedElementBinder);
     }
     it("should not add directives if they are not used", () {
       var results = process(el("<div></div>"));
@@ -76,13 +76,16 @@ main() {
           .toBe(annotatedDirectives.indexOf(decoratorWithMultipleAttrs));
     });
     it("should compile children by default", () {
-      var results = createPipeline().process(el("<div some-decor></div>"));
+      var results = createPipeline().processElements(
+          el("<div some-decor></div>"), ViewType.COMPONENT,
+          createViewDefinition());
       expect(results[0].compileChildren).toEqual(true);
     });
     it("should stop compiling children when specified in the directive config",
         () {
-      var results = createPipeline()
-          .process(el("<div some-decor-ignoring-children></div>"));
+      var results = createPipeline().processElements(
+          el("<div some-decor-ignoring-children></div>"), ViewType.COMPONENT,
+          createViewDefinition());
       expect(results[0].compileChildren).toEqual(false);
     });
     it("should bind directive properties from bound properties", () {
@@ -194,16 +197,6 @@ main() {
       });
     });
   });
-}
-class MockStep implements CompileStep {
-  Function processClosure;
-  MockStep(process) {
-    this.processClosure = process;
-  }
-  process(
-      CompileElement parent, CompileElement current, CompileControl control) {
-    this.processClosure(parent, current, control);
-  }
 }
 var someComponent = DirectiveMetadata.create(
     selector: "some-comp",

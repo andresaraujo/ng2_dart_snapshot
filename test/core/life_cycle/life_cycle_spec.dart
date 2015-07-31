@@ -16,13 +16,13 @@ import "package:angular2/test_lib.dart"
         tick,
         inject,
         SpyChangeDetector;
-import "package:angular2/src/core/life_cycle/life_cycle.dart" show LifeCycle;
+import "package:angular2/core.dart" show LifeCycle;
 
 main() {
   describe("LifeCycle", () {
     it("should throw when reentering tick", () {
       var cd = (new SpyChangeDetector() as dynamic);
-      var lc = new LifeCycle(null, cd, false);
+      var lc = new LifeCycle(cd, false);
       cd.spy("detectChanges").andCallFake(() => lc.tick());
       expect(() => lc.tick())
           .toThrowError("LifeCycle.tick is called recursively");

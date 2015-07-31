@@ -25,7 +25,7 @@ _find(AbstractControl c,
   if (!(path is List)) {
     path = StringWrapper.split((path as String), new RegExp("/"));
   }
-  if (ListWrapper.isEmpty(path)) return null;
+  if (path is List && ListWrapper.isEmpty(path)) return null;
   return ListWrapper.reduce((path as List<dynamic /* String | num */ >),
       (v, name) {
     if (v is ControlGroup) {
@@ -92,7 +92,7 @@ class AbstractControl {
       this._parent.markAsDirty(onlySelf: onlySelf);
     }
   }
-  setParent(parent) {
+  setParent(dynamic /* ControlGroup | ControlArray */ parent) {
     this._parent = parent;
   }
   void updateValidity({onlySelf}) {
@@ -144,16 +144,20 @@ class AbstractControl {
  */
 class Control extends AbstractControl {
   Function _onChange;
-  Control(dynamic value, [Function validator = Validators.nullValidator])
+  Control([dynamic value = null, Function validator = Validators.nullValidator])
       : super(validator) {
     /* super call moved to initializer */;
     this._value = value;
     this.updateValidity(onlySelf: true);
     this._valueChanges = new EventEmitter();
   }
-  void updateValue(dynamic value, {onlySelf, emitEvent}) {
+  void updateValue(dynamic value,
+      {onlySelf, emitEvent, emitModelToViewChange}) {
+    emitModelToViewChange =
+        isPresent(emitModelToViewChange) ? emitModelToViewChange : true;
     this._value = value;
-    if (isPresent(this._onChange)) this._onChange(this._value);
+    if (isPresent(this._onChange) && emitModelToViewChange) this
+        ._onChange(this._value);
     this.updateValueAndValidity(onlySelf: onlySelf, emitEvent: emitEvent);
   }
   void registerOnChange(Function fn) {

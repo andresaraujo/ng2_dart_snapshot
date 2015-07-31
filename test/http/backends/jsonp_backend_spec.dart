@@ -22,6 +22,7 @@ import "package:angular2/di.dart" show bind, Injector;
 import "package:angular2/src/facade/lang.dart" show isPresent, StringWrapper;
 import "package:angular2/src/facade/async.dart" show TimerWrapper;
 import "package:angular2/src/http/static_request.dart" show Request;
+import "package:angular2/src/http/static_response.dart" show Response;
 import "package:angular2/src/facade/collection.dart" show Map;
 import "package:angular2/src/http/base_request_options.dart"
     show RequestOptions, BaseRequestOptions;
@@ -32,6 +33,7 @@ import "package:angular2/src/http/enums.dart"
 
 var addEventListenerSpy;
 var existingScripts = [];
+Response unused;
 class MockBrowserJsonp extends BrowserJsonp {
   String src;
   Map<String, dynamic /* (data: any) => any */ > callbacks;

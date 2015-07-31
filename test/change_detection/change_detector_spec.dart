@@ -16,7 +16,7 @@ import "package:angular2/src/facade/lang.dart"
     show isPresent, isBlank, isJsObject, BaseException, FunctionWrapper;
 import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, MapWrapper, StringMapWrapper;
-import "package:angular2/change_detection.dart"
+import "package:angular2/src/change_detection/change_detection.dart"
     show
         ChangeDispatcher,
         DehydratedException,
@@ -279,6 +279,15 @@ main() {
         val.changeDetector.detectChanges();
         expect(val.dispatcher.log).toEqual(["propName=BvalueA"]);
       });
+      it("should output empty strings for null values in interpolation", () {
+        var val = _createChangeDetector("interpolation", new TestData("value"));
+        val.changeDetector.hydrate(new TestData(null), null, null, null);
+        val.changeDetector.detectChanges();
+        expect(val.dispatcher.log).toEqual(["propName=BA"]);
+      });
+      it("should escape values in literals that indicate interpolation", () {
+        expect(_bindSimpleValue("\"\$\"")).toEqual(["propName=\$"]);
+      });
       describe("pure functions", () {
         it("should preserve memoized result", () {
           var person = new Person("bob");
@@ -314,6 +323,14 @@ main() {
             val.changeDetector.detectChanges();
             expect(val.dispatcher.loggedValues)
                 .toEqual(["value one two default"]);
+          });
+          it("should support pipes as arguments to pure functions", () {
+            var registry = new FakePipes("pipe", () => new IdentityPipe());
+            var person = new Person("bob");
+            var val =
+                _createChangeDetector("(name | pipe).length", person, registry);
+            val.changeDetector.detectChanges();
+            expect(val.dispatcher.loggedValues).toEqual([3]);
           });
         });
         it("should notify the dispatcher on all changes done", () {
@@ -906,6 +923,9 @@ class TestDispatcher implements ChangeDispatcher {
   }
   notifyOnAllChangesDone() {
     this.onAllChangesDoneCalled = true;
+  }
+  getDebugContext(a, b) {
+    return null;
   }
   _asString(value) {
     return (isBlank(value) ? "null" : value.toString());

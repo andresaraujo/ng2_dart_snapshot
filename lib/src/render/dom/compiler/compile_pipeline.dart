@@ -7,34 +7,41 @@ import "compile_element.dart" show CompileElement;
 import "compile_control.dart" show CompileControl;
 import "compile_step.dart" show CompileStep;
 import "../view/proto_view_builder.dart" show ProtoViewBuilder;
-import "../../api.dart" show ProtoViewDto, ViewType;
+import "../../api.dart" show ProtoViewDto, ViewType, ViewDefinition;
 
 /**
  * CompilePipeline for executing CompileSteps recursively for
  * all elements in a template.
  */
 class CompilePipeline {
+  List<CompileStep> steps;
   CompileControl _control;
-  CompilePipeline(List<CompileStep> steps) {
+  CompilePipeline(this.steps) {
     this._control = new CompileControl(steps);
   }
-  List<CompileElement> process(rootElement,
-      [ViewType protoViewType = null, String compilationCtxtDescription = ""]) {
-    if (isBlank(protoViewType)) {
-      protoViewType = ViewType.COMPONENT;
-    }
-    var results = [];
+  List<String> processStyles(List<String> styles) {
+    return styles.map((style) {
+      this.steps.forEach((step) {
+        style = step.processStyle(style);
+      });
+      return style;
+    }).toList();
+  }
+  List<CompileElement> processElements(
+      dynamic rootElement, ViewType protoViewType, ViewDefinition viewDef) {
+    List<CompileElement> results = [];
+    var compilationCtxtDescription = viewDef.componentId;
     var rootCompileElement =
         new CompileElement(rootElement, compilationCtxtDescription);
     rootCompileElement.inheritedProtoView =
-        new ProtoViewBuilder(rootElement, protoViewType);
+        new ProtoViewBuilder(rootElement, protoViewType, viewDef.encapsulation);
     rootCompileElement.isViewRoot = true;
-    this._process(
+    this._processElement(
         results, null, rootCompileElement, compilationCtxtDescription);
     return results;
   }
-  _process(results, CompileElement parent, CompileElement current,
-      [String compilationCtxtDescription = ""]) {
+  _processElement(List<CompileElement> results, CompileElement parent,
+      CompileElement current, [String compilationCtxtDescription = ""]) {
     var additionalChildren =
         this._control.internalProcess(results, 0, parent, current);
     if (current.compileChildren) {
@@ -52,14 +59,14 @@ class CompilePipeline {
               current.inheritedElementBinder;
           childCompileElement.distanceToInheritedBinder =
               current.distanceToInheritedBinder + 1;
-          this._process(results, current, childCompileElement);
+          this._processElement(results, current, childCompileElement);
         }
         node = nextNode;
       }
     }
     if (isPresent(additionalChildren)) {
       for (var i = 0; i < additionalChildren.length; i++) {
-        this._process(results, current, additionalChildren[i]);
+        this._processElement(results, current, additionalChildren[i]);
       }
     }
   }

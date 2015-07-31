@@ -5,7 +5,8 @@ import "package:angular2/src/facade/lang.dart"
 import "package:angular2/src/facade/collection.dart"
     show List, MapWrapper, ListWrapper;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
-import "package:angular2/change_detection.dart" show Parser;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show Parser;
 import "package:angular2/src/render/dom/compiler/selector.dart"
     show SelectorMatcher, CssSelector;
 import "compile_step.dart" show CompileStep;
@@ -33,6 +34,9 @@ class DirectiveParser implements CompileStep {
       this._selectorMatcher.addSelectables(selector, i);
     }
   }
+  String processStyle(String style) {
+    return style;
+  }
   _ensureComponentOnlyHasElementSelector(selector, directive) {
     var isElementSelector =
         identical(selector.length, 1) && selector[0].isElementSelector();
@@ -42,7 +46,7 @@ class DirectiveParser implements CompileStep {
           '''Component \'${ directive . id}\' can only have an element selector, but had \'${ directive . selector}\'''');
     }
   }
-  process(
+  processElement(
       CompileElement parent, CompileElement current, CompileControl control) {
     var attrs = current.attrs();
     var classList = current.classList();
@@ -81,20 +85,20 @@ class DirectiveParser implements CompileStep {
         });
       }
       if (isPresent(dirMetadata.hostListeners)) {
-        MapWrapper.forEach(dirMetadata.hostListeners, (action, eventName) {
+        this._sortedKeysForEach(dirMetadata.hostListeners, (action, eventName) {
           this._bindDirectiveEvent(
               eventName, action, current, directiveBinderBuilder);
         });
       }
       if (isPresent(dirMetadata.hostProperties)) {
-        MapWrapper.forEach(dirMetadata.hostProperties,
+        this._sortedKeysForEach(dirMetadata.hostProperties,
             (expression, hostPropertyName) {
           this._bindHostProperty(
               hostPropertyName, expression, current, directiveBinderBuilder);
         });
       }
       if (isPresent(dirMetadata.hostAttributes)) {
-        MapWrapper.forEach(dirMetadata.hostAttributes,
+        this._sortedKeysForEach(dirMetadata.hostAttributes,
             (hostAttrValue, hostAttrName) {
           this._addHostAttribute(hostAttrName, hostAttrValue, current);
         });
@@ -104,6 +108,18 @@ class DirectiveParser implements CompileStep {
           elementBinder.readAttribute(attrName);
         });
       }
+    });
+  }
+  void _sortedKeysForEach(Map<String, String> map,
+      dynamic /* (value: string, key: string) => void */ fn) {
+    var keys = MapWrapper.keys(map);
+    ListWrapper.sort(keys, (a, b) {
+      // Ensure a stable sort.
+      var compareVal = StringWrapper.compare(a, b);
+      return compareVal == 0 ? -1 : compareVal;
+    });
+    ListWrapper.forEach(keys, (key) {
+      fn(MapWrapper.get(map, key), key);
     });
   }
   void _ensureHasOnlyOneComponent(

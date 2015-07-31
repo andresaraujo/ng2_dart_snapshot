@@ -1,6 +1,7 @@
 library angular2.src.change_detection.coalesce;
 
-import "package:angular2/src/facade/lang.dart" show isPresent, isBlank;
+import "package:angular2/src/facade/lang.dart"
+    show isPresent, isBlank, looseIdentical;
 import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, Map;
 import "proto_record.dart" show RecordType, ProtoRecord;
@@ -25,7 +26,11 @@ List<ProtoRecord> coalesce(List<ProtoRecord> records) {
     if (isPresent(matchingRecord) && record.lastInBinding) {
       res.add(_selfRecord(record, matchingRecord.selfIndex, res.length + 1));
       indexMap[r.selfIndex] = matchingRecord.selfIndex;
+      matchingRecord.referencedBySelf = true;
     } else if (isPresent(matchingRecord) && !record.lastInBinding) {
+      if (record.argumentToPureFunction) {
+        matchingRecord.argumentToPureFunction = true;
+      }
       indexMap[r.selfIndex] = matchingRecord.selfIndex;
     } else {
       res.add(record);
@@ -37,16 +42,16 @@ List<ProtoRecord> coalesce(List<ProtoRecord> records) {
 ProtoRecord _selfRecord(ProtoRecord r, num contextIndex, num selfIndex) {
   return new ProtoRecord(RecordType.SELF, "self", null, [], r.fixedArgs,
       contextIndex, r.directiveIndex, selfIndex, r.bindingRecord,
-      r.expressionAsString, r.lastInBinding, r.lastInDirective);
+      r.expressionAsString, r.lastInBinding, r.lastInDirective, false, false);
 }
 _findMatching(ProtoRecord r, List<ProtoRecord> rs) {
   return ListWrapper.find(rs,
       (rr) => !identical(rr.mode, RecordType.DIRECTIVE_LIFECYCLE) &&
           _sameDirIndex(rr, r) &&
           identical(rr.mode, r.mode) &&
-          identical(rr.funcOrValue, r.funcOrValue) &&
+          looseIdentical(rr.funcOrValue, r.funcOrValue) &&
           identical(rr.contextIndex, r.contextIndex) &&
-          identical(rr.name, r.name) &&
+          looseIdentical(rr.name, r.name) &&
           ListWrapper.equals(rr.args, r.args));
 }
 bool _sameDirIndex(ProtoRecord a, ProtoRecord b) {
@@ -61,7 +66,8 @@ _replaceIndices(ProtoRecord r, num selfIndex, Map<dynamic, dynamic> indexMap) {
   var contextIndex = _map(indexMap, r.contextIndex);
   return new ProtoRecord(r.mode, r.name, r.funcOrValue, args, r.fixedArgs,
       contextIndex, r.directiveIndex, selfIndex, r.bindingRecord,
-      r.expressionAsString, r.lastInBinding, r.lastInDirective);
+      r.expressionAsString, r.lastInBinding, r.lastInDirective,
+      r.argumentToPureFunction, r.referencedBySelf);
 }
 _map(Map<dynamic, dynamic> indexMap, num value) {
   var r = indexMap[value];

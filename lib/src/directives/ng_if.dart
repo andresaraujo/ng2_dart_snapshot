@@ -1,7 +1,7 @@
 library angular2.src.directives.ng_if;
 
 import "package:angular2/annotations.dart" show Directive;
-import "package:angular2/core.dart" show ViewContainerRef, ProtoViewRef;
+import "package:angular2/core.dart" show ViewContainerRef, TemplateRef;
 import "package:angular2/src/facade/lang.dart" show isBlank;
 
 /**
@@ -29,17 +29,17 @@ import "package:angular2/src/facade/lang.dart" show isBlank;
 @Directive(selector: "[ng-if]", properties: const ["ngIf"])
 class NgIf {
   ViewContainerRef viewContainer;
-  ProtoViewRef protoViewRef;
+  TemplateRef templateRef;
   bool prevCondition;
-  NgIf(ViewContainerRef viewContainer, ProtoViewRef protoViewRef) {
+  NgIf(ViewContainerRef viewContainer, TemplateRef templateRef) {
     this.viewContainer = viewContainer;
     this.prevCondition = null;
-    this.protoViewRef = protoViewRef;
+    this.templateRef = templateRef;
   }
   set ngIf(newCondition) {
     if (newCondition && (isBlank(this.prevCondition) || !this.prevCondition)) {
       this.prevCondition = true;
-      this.viewContainer.create(this.protoViewRef);
+      this.viewContainer.createEmbeddedView(this.templateRef);
     } else if (!newCondition &&
         (isBlank(this.prevCondition) || this.prevCondition)) {
       this.prevCondition = false;

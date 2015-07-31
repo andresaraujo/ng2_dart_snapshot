@@ -9,7 +9,6 @@ import "exceptions.dart"
     show
         AbstractBindingError,
         NoBindingError,
-        AsyncBindingError,
         CyclicDependencyError,
         InstantiationError,
         InvalidBindingError,
@@ -18,16 +17,16 @@ import "package:angular2/src/facade/lang.dart"
     show FunctionWrapper, Type, isPresent, isBlank;
 import "key.dart" show Key;
 import "forward_ref.dart" show resolveForwardRef;
-import "metadata.dart" show VisibilityMetadata, DEFAULT_VISIBILITY;
+import "metadata.dart" show SelfMetadata, HostMetadata, SkipSelfMetadata;
 
 const _constructing = const Object();
 const _notFound = const Object();
 // Threshold for the dynamic version
 const _MAX_CONSTRUCTION_COUNTER = 10;
-const undefinedValue = const Object();
-const PUBLIC = 1;
-const PRIVATE = 2;
-const PUBLIC_AND_PRIVATE = 3;
+const Object undefinedValue = const Object();
+const num PUBLIC = 1;
+const num PRIVATE = 2;
+const num PUBLIC_AND_PRIVATE = 3;
 abstract class ProtoInjectorStrategy {
   ResolvedBinding getBindingAtIndex(num index);
   InjectorStrategy createInjectorStrategy(Injector inj);
@@ -161,9 +160,10 @@ class ProtoInjectorDynamicStrategy implements ProtoInjectorStrategy {
   }
 }
 class ProtoInjector {
-  num distanceToParent;
   ProtoInjectorStrategy _strategy;
-  ProtoInjector(List<BindingWithVisibility> bwv, this.distanceToParent) {
+  num numberOfBindings;
+  ProtoInjector(List<BindingWithVisibility> bwv) {
+    this.numberOfBindings = bwv.length;
     this._strategy = bwv.length > _MAX_CONSTRUCTION_COUNTER
         ? new ProtoInjectorDynamicStrategy(this, bwv)
         : new ProtoInjectorInlineStrategy(this, bwv);
@@ -176,8 +176,8 @@ abstract class InjectorStrategy {
   dynamic getObjByKeyId(num keyId, num visibility);
   dynamic getObjAtIndex(num index);
   num getMaxNumberOfObjects();
-  void attach(Injector parent, bool isBoundary);
-  void resetContructionCounter();
+  void attach(Injector parent, bool isHost);
+  void resetConstructionCounter();
   dynamic instantiateBinding(ResolvedBinding binding, num visibility);
 }
 class InjectorInlineStrategy implements InjectorStrategy {
@@ -194,16 +194,16 @@ class InjectorInlineStrategy implements InjectorStrategy {
   dynamic obj8 = undefinedValue;
   dynamic obj9 = undefinedValue;
   InjectorInlineStrategy(this.injector, this.protoStrategy) {}
-  void resetContructionCounter() {
+  void resetConstructionCounter() {
     this.injector._constructionCounter = 0;
   }
   dynamic instantiateBinding(ResolvedBinding binding, num visibility) {
     return this.injector._new(binding, visibility);
   }
-  void attach(Injector parent, bool isBoundary) {
+  void attach(Injector parent, bool isHost) {
     var inj = this.injector;
     inj._parent = parent;
-    inj._isBoundary = isBoundary;
+    inj._isHost = isHost;
   }
   dynamic getObjByKeyId(num keyId, num visibility) {
     var p = this.protoStrategy;
@@ -295,16 +295,16 @@ class InjectorDynamicStrategy implements InjectorStrategy {
     this.objs = ListWrapper.createFixedSize(protoStrategy.bindings.length);
     ListWrapper.fill(this.objs, undefinedValue);
   }
-  void resetContructionCounter() {
+  void resetConstructionCounter() {
     this.injector._constructionCounter = 0;
   }
   dynamic instantiateBinding(ResolvedBinding binding, num visibility) {
     return this.injector._new(binding, visibility);
   }
-  void attach(Injector parent, bool isBoundary) {
+  void attach(Injector parent, bool isHost) {
     var inj = this.injector;
     inj._parent = parent;
-    inj._isBoundary = isBoundary;
+    inj._isHost = isHost;
   }
   dynamic getObjByKeyId(num keyId, num visibility) {
     var p = this.protoStrategy;
@@ -386,6 +386,7 @@ class Injector {
   ProtoInjector _proto;
   Injector _parent;
   DependencyProvider _depProvider;
+  Function _debugContext;
   /**
    * Turns a list of binding definitions into an internal resolved list of resolved bindings.
    *
@@ -438,15 +439,24 @@ class Injector {
   static Injector fromResolvedBindings(List<ResolvedBinding> bindings,
       [DependencyProvider depProvider = null]) {
     var bd = bindings.map((b) => new BindingWithVisibility(b, PUBLIC)).toList();
-    var proto = new ProtoInjector(bd, 0);
+    var proto = new ProtoInjector(bd);
     var inj = new Injector(proto, null, depProvider);
     return inj;
   }
   InjectorStrategy _strategy;
-  bool _isBoundary = false;
+  bool _isHost = false;
   num _constructionCounter = 0;
-  Injector(this._proto, [this._parent = null, this._depProvider = null]) {
+  Injector(this._proto, [this._parent = null, this._depProvider = null,
+      this._debugContext = null]) {
     this._strategy = _proto._strategy.createInjectorStrategy(this);
+  }
+  /**
+   * Returns debug information about the injector.
+   *
+   * This information is included into exceptions thrown by the injector.
+   */
+  dynamic debugContext() {
+    return this._debugContext();
   }
   /**
    * Retrieves an instance from the injector.
@@ -455,9 +465,9 @@ class Injector {
    *binding).
    * @returns an instance represented by the token. Throws if not found.
    */
-  dynamic get(token) {
+  dynamic get(dynamic token) {
     return this._getByKey(
-        Key.get(token), DEFAULT_VISIBILITY, false, PUBLIC_AND_PRIVATE);
+        Key.get(token), null, null, false, PUBLIC_AND_PRIVATE);
   }
   /**
    * Retrieves an instance from the injector.
@@ -465,9 +475,8 @@ class Injector {
    * @param `token`: usually a `Type`. (Same as the token used while setting up a binding).
    * @returns an instance represented by the token. Returns `null` if not found.
    */
-  dynamic getOptional(token) {
-    return this._getByKey(
-        Key.get(token), DEFAULT_VISIBILITY, true, PUBLIC_AND_PRIVATE);
+  dynamic getOptional(dynamic token) {
+    return this._getByKey(Key.get(token), null, null, true, PUBLIC_AND_PRIVATE);
   }
   /**
    * Retrieves an instance from the injector.
@@ -520,14 +529,14 @@ class Injector {
   Injector createChildFromResolved(List<ResolvedBinding> bindings,
       [DependencyProvider depProvider = null]) {
     var bd = bindings.map((b) => new BindingWithVisibility(b, PUBLIC)).toList();
-    var proto = new ProtoInjector(bd, 1);
+    var proto = new ProtoInjector(bd);
     var inj = new Injector(proto, null, depProvider);
     inj._parent = this;
     return inj;
   }
   dynamic _new(ResolvedBinding binding, num visibility) {
     if (this._constructionCounter++ > this._strategy.getMaxNumberOfObjects()) {
-      throw new CyclicDependencyError(binding.key);
+      throw new CyclicDependencyError(this, binding.key);
     }
     var factory = binding.factory;
     var deps = binding.dependencies;
@@ -614,7 +623,9 @@ class Injector {
           ? this._getByDependency(binding, deps[19], visibility)
           : null;
     } catch (e, e_stack) {
-      if (e is AbstractBindingError) e.addKey(binding.key);
+      if (e is AbstractBindingError) {
+        e.addKey(this, binding.key);
+      }
       rethrow;
     }
     var obj;
@@ -692,7 +703,7 @@ class Injector {
           break;
       }
     } catch (e, e_stack) {
-      throw new InstantiationError(e, e_stack, binding.key);
+      throw new InstantiationError(this, e, e_stack, binding.key);
     }
     return obj;
   }
@@ -704,52 +715,88 @@ class Injector {
     if (!identical(special, undefinedValue)) {
       return special;
     } else {
-      return this._getByKey(
-          dep.key, dep.visibility, dep.optional, bindingVisibility);
+      return this._getByKey(dep.key, dep.lowerBoundVisibility,
+          dep.upperBoundVisibility, dep.optional, bindingVisibility);
     }
   }
-  dynamic _getByKey(Key key, VisibilityMetadata depVisibility, bool optional,
-      num bindingVisibility) {
-    if (identical(key.token, Injector)) {
+  dynamic _getByKey(Key key, Object lowerBoundVisibility,
+      Object upperBoundVisibility, bool optional, num bindingVisibility) {
+    if (identical(key, INJECTOR_KEY)) {
       return this;
     }
-    var inj = this;
-    var lastInjector = false;
-    var depth = depVisibility.depth;
-    if (!depVisibility.includeSelf) {
-      depth -= inj._proto.distanceToParent;
-      if (inj._isBoundary) {
-        if (depVisibility.crossBoundaries) {
-          bindingVisibility = PUBLIC_AND_PRIVATE;
-        } else {
-          bindingVisibility = PRIVATE;
-          lastInjector = true;
-        }
-      }
-      inj = inj._parent;
+    if (upperBoundVisibility is SelfMetadata) {
+      return this._getByKeySelf(key, optional, bindingVisibility);
+    } else if (upperBoundVisibility is HostMetadata) {
+      return this._getByKeyHost(
+          key, optional, bindingVisibility, lowerBoundVisibility);
+    } else {
+      return this._getByKeyDefault(
+          key, optional, bindingVisibility, lowerBoundVisibility);
     }
-    while (inj != null && depth >= 0) {
-      var obj = inj._strategy.getObjByKeyId(key.id, bindingVisibility);
-      if (!identical(obj, undefinedValue)) return obj;
-      depth -= inj._proto.distanceToParent;
-      if (lastInjector) break;
-      if (inj._isBoundary) {
-        if (depVisibility.crossBoundaries) {
-          bindingVisibility = PUBLIC_AND_PRIVATE;
-        } else {
-          bindingVisibility = PRIVATE;
-          lastInjector = true;
-        }
-      }
-      inj = inj._parent;
-    }
+  }
+  dynamic _throwOrNull(Key key, bool optional) {
     if (optional) {
       return null;
     } else {
-      throw new NoBindingError(key);
+      throw new NoBindingError(this, key);
     }
   }
+  dynamic _getByKeySelf(Key key, bool optional, num bindingVisibility) {
+    var obj = this._strategy.getObjByKeyId(key.id, bindingVisibility);
+    return (!identical(obj, undefinedValue))
+        ? obj
+        : this._throwOrNull(key, optional);
+  }
+  dynamic _getByKeyHost(Key key, bool optional, num bindingVisibility,
+      Object lowerBoundVisibility) {
+    var inj = this;
+    if (lowerBoundVisibility is SkipSelfMetadata) {
+      if (inj._isHost) {
+        return this._getPrivateDependency(key, optional, inj);
+      } else {
+        inj = inj._parent;
+      }
+    }
+    while (inj != null) {
+      var obj = inj._strategy.getObjByKeyId(key.id, bindingVisibility);
+      if (!identical(obj, undefinedValue)) return obj;
+      if (isPresent(inj._parent) && inj._isHost) {
+        return this._getPrivateDependency(key, optional, inj);
+      } else {
+        inj = inj._parent;
+      }
+    }
+    return this._throwOrNull(key, optional);
+  }
+  dynamic _getPrivateDependency(Key key, bool optional, Injector inj) {
+    var obj = inj._parent._strategy.getObjByKeyId(key.id, PRIVATE);
+    return (!identical(obj, undefinedValue))
+        ? obj
+        : this._throwOrNull(key, optional);
+  }
+  dynamic _getByKeyDefault(Key key, bool optional, num bindingVisibility,
+      Object lowerBoundVisibility) {
+    var inj = this;
+    if (lowerBoundVisibility is SkipSelfMetadata) {
+      bindingVisibility = inj._isHost ? PUBLIC_AND_PRIVATE : PUBLIC;
+      inj = inj._parent;
+    }
+    while (inj != null) {
+      var obj = inj._strategy.getObjByKeyId(key.id, bindingVisibility);
+      if (!identical(obj, undefinedValue)) return obj;
+      bindingVisibility = inj._isHost ? PUBLIC_AND_PRIVATE : PUBLIC;
+      inj = inj._parent;
+    }
+    return this._throwOrNull(key, optional);
+  }
+  String get displayName {
+    return '''Injector(bindings: [${ _mapBindings ( this , ( b ) => ''' "${ b . key . displayName}" ''' ) . join ( ", " )}])''';
+  }
+  String toString() {
+    return this.displayName;
+  }
 }
+var INJECTOR_KEY = Key.get(Injector);
 List<ResolvedBinding> _resolveBindings(
     List<dynamic /* Type | Binding | List < dynamic > */ > bindings) {
   var resolvedList = ListWrapper.createFixedSize(bindings.length);
@@ -787,5 +834,12 @@ Map<num, ResolvedBinding> _flattenBindings(
       _flattenBindings(b, res);
     }
   });
+  return res;
+}
+List<dynamic> _mapBindings(Injector injector, Function fn) {
+  var res = [];
+  for (var i = 0; i < injector._proto.numberOfBindings; ++i) {
+    res.add(fn(injector._proto.getBindingAtIndex(i)));
+  }
   return res;
 }

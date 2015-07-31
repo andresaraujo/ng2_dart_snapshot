@@ -28,7 +28,7 @@ import "../change_detector_ref.dart" show ChangeDetectorRef;
  * ```
  */
 class JsonPipe extends BasePipe implements PipeFactory {
-  String transform(value, [List<dynamic> args = null]) {
+  String transform(dynamic value, [List<dynamic> args = null]) {
     return Json.stringify(value);
   }
   Pipe create(ChangeDetectorRef cdRef) {

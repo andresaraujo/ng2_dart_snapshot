@@ -17,12 +17,38 @@ import "package:angular2/test_lib.dart"
         xit;
 import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, StringMapWrapper;
-import "package:angular2/angular2.dart" show Component, View;
+import "package:angular2/angular2.dart" show Component, View, NgFor, bind;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
 import "package:angular2/src/directives/class.dart" show CSSClass;
+import "package:angular2/src/core/compiler/view_pool.dart"
+    show APP_VIEW_POOL_CAPACITY;
 
 main() {
   describe("binding to CSS class list", () {
+    describe("viewpool support", () {
+      beforeEachBindings(() {
+        return [bind(APP_VIEW_POOL_CAPACITY).toValue(100)];
+      });
+      it("should clean up when the directive is destroyed", inject([
+        TestComponentBuilder,
+        AsyncTestCompleter
+      ], (TestComponentBuilder tcb, async) {
+        var template =
+            "<div *ng-for=\"var item of items\" [class]=\"item\"></div>";
+        tcb
+            .overrideTemplate(TestComponent, template)
+            .createAsync(TestComponent)
+            .then((rootTC) {
+          rootTC.componentInstance.items = [["0"]];
+          rootTC.detectChanges();
+          rootTC.componentInstance.items = [["1"]];
+          rootTC.detectChanges();
+          expect(rootTC.componentViewChildren[1].nativeElement.className)
+              .toEqual("ng-binding 1");
+          async.done();
+        });
+      }));
+    });
     describe("expressions evaluating to objects", () {
       it("should add classes specified in an object literal", inject([
         TestComponentBuilder,
@@ -36,6 +62,23 @@ main() {
           rootTC.detectChanges();
           expect(rootTC.componentViewChildren[0].nativeElement.className)
               .toEqual("ng-binding foo");
+          async.done();
+        });
+      }));
+      it("should add classes specified in an object literal without change in class names",
+          inject([
+        TestComponentBuilder,
+        AsyncTestCompleter
+      ], (TestComponentBuilder tcb, async) {
+        var template =
+            '''<div [class]="{\'foo-bar\': true, \'fooBar\': true}"></div>''';
+        tcb
+            .overrideTemplate(TestComponent, template)
+            .createAsync(TestComponent)
+            .then((rootTC) {
+          rootTC.detectChanges();
+          expect(rootTC.componentViewChildren[0].nativeElement.className)
+              .toEqual("ng-binding foo-bar fooBar");
           async.done();
         });
       }));
@@ -118,14 +161,15 @@ main() {
         TestComponentBuilder,
         AsyncTestCompleter
       ], (TestComponentBuilder tcb, async) {
-        var template = '''<div [class]="[\'foo\', \'bar\']"></div>''';
+        var template =
+            '''<div [class]="[\'foo\', \'bar\', \'foo-bar\', \'fooBar\']"></div>''';
         tcb
             .overrideTemplate(TestComponent, template)
             .createAsync(TestComponent)
             .then((rootTC) {
           rootTC.detectChanges();
           expect(rootTC.componentViewChildren[0].nativeElement.className)
-              .toEqual("ng-binding foo bar");
+              .toEqual("ng-binding foo bar foo-bar fooBar");
           async.done();
         });
       }));
@@ -183,14 +227,14 @@ main() {
         TestComponentBuilder,
         AsyncTestCompleter
       ], (TestComponentBuilder tcb, async) {
-        var template = '''<div [class]="\'foo bar\'"></div>''';
+        var template = '''<div [class]="\'foo bar foo-bar fooBar\'"></div>''';
         tcb
             .overrideTemplate(TestComponent, template)
             .createAsync(TestComponent)
             .then((rootTC) {
           rootTC.detectChanges();
           expect(rootTC.componentViewChildren[0].nativeElement.className)
-              .toEqual("ng-binding foo bar");
+              .toEqual("ng-binding foo bar foo-bar fooBar");
           async.done();
         });
       }));
@@ -333,9 +377,10 @@ main() {
   });
 }
 @Component(selector: "test-cmp")
-@View(directives: const [CSSClass])
+@View(directives: const [CSSClass, NgFor])
 class TestComponent {
   bool condition = true;
+  List<dynamic> items;
   List<String> arrExpr = ["foo"];
   var objExpr = {"foo": true, "bar": false};
   var strExpr = "foo";

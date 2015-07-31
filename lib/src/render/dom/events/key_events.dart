@@ -12,6 +12,7 @@ import "package:angular2/src/facade/lang.dart"
 import "package:angular2/src/facade/collection.dart"
     show StringMapWrapper, ListWrapper;
 import "event_manager.dart" show EventManagerPlugin;
+import "package:angular2/src/core/zone/ng_zone.dart" show NgZone;
 
 var modifierKeys = ["alt", "control", "meta", "shift"];
 Map<String, Function> modifierKeyGetters = {
@@ -27,8 +28,8 @@ class KeyEventsPlugin extends EventManagerPlugin {
   bool supports(String eventName) {
     return isPresent(KeyEventsPlugin.parseEventName(eventName));
   }
-  addEventListener(
-      element, String eventName, Function handler, bool shouldSupportBubble) {
+  addEventListener(dynamic element, String eventName,
+      dynamic /* (Event: any) => any */ handler, bool shouldSupportBubble) {
     var parsedEvent = KeyEventsPlugin.parseEventName(eventName);
     var outsideHandler = KeyEventsPlugin.eventCallback(element,
         shouldSupportBubble, StringMapWrapper.get(parsedEvent, "fullKey"),
@@ -64,7 +65,7 @@ class KeyEventsPlugin extends EventManagerPlugin {
     StringMapWrapper.set(result, "fullKey", fullKey);
     return result;
   }
-  static String getEventFullKey(event) {
+  static String getEventFullKey(dynamic event) {
     var fullKey = "";
     var key = DOM.getEventKey(event);
     key = key.toLowerCase();
@@ -85,8 +86,9 @@ class KeyEventsPlugin extends EventManagerPlugin {
     fullKey += key;
     return fullKey;
   }
-  static dynamic /* (event: Event) => void */ eventCallback(
-      element, shouldSupportBubble, fullKey, handler, zone) {
+  static dynamic /* (event: Event) => void */ eventCallback(dynamic element,
+      bool shouldSupportBubble, dynamic fullKey,
+      dynamic /* (Event) => any */ handler, NgZone zone) {
     return (event) {
       var correctElement =
           shouldSupportBubble || identical(event.target, element);

@@ -18,8 +18,9 @@ import "package:angular2/test_lib.dart"
 import "package:angular2/src/facade/collection.dart"
     show List, ListWrapper, Map, MapWrapper, StringMapWrapper;
 import "package:angular2/src/facade/lang.dart"
-    show Type, isBlank, stringify, isPresent;
-import "package:angular2/src/facade/async.dart" show PromiseWrapper, Future;
+    show Type, isBlank, stringify, isPresent, isArray;
+import "package:angular2/src/facade/async.dart"
+    show PromiseCompleter, PromiseWrapper, Future;
 import "package:angular2/src/core/compiler/compiler.dart"
     show Compiler, CompilerCache;
 import "package:angular2/src/core/compiler/view.dart" show AppProtoView;
@@ -55,6 +56,22 @@ main() {
         cmpUrlMapper,
         rootProtoView;
     List<dynamic> renderCompileRequests;
+    createCompiler(
+        List<dynamic /* renderApi . ProtoViewDto | Future < renderApi . ProtoViewDto > */ > renderCompileResults,
+        List<AppProtoView> protoViewFactoryResults) {
+      var urlResolver = new UrlResolver();
+      renderCompileRequests = [];
+      renderCompileResults = ListWrapper.clone(renderCompileResults);
+      renderCompiler.spy("compile").andCallFake((view) {
+        renderCompileRequests.add(view);
+        return PromiseWrapper
+            .resolve(ListWrapper.removeAt(renderCompileResults, 0));
+      });
+      protoViewFactory = new FakeProtoViewFactory(protoViewFactoryResults);
+      return new Compiler(directiveResolver, new CompilerCache(), tplResolver,
+          cmpUrlMapper, urlResolver, renderCompiler, protoViewFactory,
+          new AppRootUrl("http://www.app.com"));
+    }
     beforeEach(() {
       directiveResolver = new DirectiveResolver();
       tplResolver = new FakeViewResolver();
@@ -64,28 +81,20 @@ main() {
         return PromiseWrapper.resolve(createRenderProtoView(
             [createRenderComponentElementBinder(0)], renderApi.ViewType.HOST));
       });
+      renderCompiler.spy("mergeProtoViewsRecursively").andCallFake(
+          (List<dynamic /* renderApi . RenderProtoViewRef | List < dynamic > */ > protoViewRefs) {
+        return PromiseWrapper.resolve(new renderApi.RenderProtoViewMergeMapping(
+            new MergedRenderProtoViewRef(protoViewRefs), 1, [], 0, [], [],
+            [null]));
+      });
+      // TODO spy on .compile and return RenderProtoViewRef, same for compileHost
       rootProtoView = createRootProtoView(directiveResolver, MainComponent);
     });
-    createCompiler(
-        List<dynamic /* renderApi . ProtoViewDto | Future < renderApi . ProtoViewDto > */ > renderCompileResults,
-        List<List<AppProtoView>> protoViewFactoryResults) {
-      var urlResolver = new UrlResolver();
-      renderCompileRequests = [];
-      renderCompiler.spy("compile").andCallFake((view) {
-        renderCompileRequests.add(view);
-        return PromiseWrapper
-            .resolve(ListWrapper.removeAt(renderCompileResults, 0));
-      });
-      protoViewFactory = new FakeProtoViewFactory(protoViewFactoryResults);
-      return new Compiler(directiveResolver, new CompilerCache(), tplResolver,
-          cmpUrlMapper, urlResolver, renderCompiler, protoViewFactory,
-          new FakeAppRootUrl());
-    }
     describe("serialize template", () {
       Future<renderApi.ViewDefinition> captureTemplate(viewAnn.View template) {
         tplResolver.setView(MainComponent, template);
         var compiler = createCompiler(
-            [createRenderProtoView()], [[rootProtoView], [createProtoView()]]);
+            [createRenderProtoView()], [rootProtoView, createProtoView()]);
         return compiler.compileInHost(MainComponent).then((_) {
           expect(renderCompileRequests.length).toBe(1);
           return renderCompileRequests[0];
@@ -248,7 +257,7 @@ main() {
         var renderProtoView = createRenderProtoView();
         var expectedProtoView = createProtoView();
         var compiler = createCompiler(
-            [renderProtoView], [[rootProtoView], [expectedProtoView]]);
+            [renderProtoView], [rootProtoView, expectedProtoView]);
         compiler.compileInHost(MainComponent).then((_) {
           var request = protoViewFactory.requests[1];
           expect(request[1]).toBe(renderProtoView);
@@ -260,7 +269,7 @@ main() {
         tplResolver.setView(
             MainComponent, new viewAnn.View(template: "<div></div>"));
         var compiler = createCompiler(
-            [createRenderProtoView()], [[rootProtoView], [createProtoView()]]);
+            [createRenderProtoView()], [rootProtoView, createProtoView()]);
         compiler.compileInHost(MainComponent).then((_) {
           var request = protoViewFactory.requests[1];
           expect(request[0].key.token).toBe(MainComponent);
@@ -272,7 +281,7 @@ main() {
         tplResolver.setView(MainComponent, new viewAnn.View(
             template: "<div></div>", directives: [SomeDirective]));
         var compiler = createCompiler(
-            [createRenderProtoView()], [[rootProtoView], [createProtoView()]]);
+            [createRenderProtoView()], [rootProtoView, createProtoView()]);
         compiler.compileInHost(MainComponent).then((_) {
           var request = protoViewFactory.requests[1];
           var binding = request[2][0];
@@ -285,7 +294,7 @@ main() {
         tplResolver.setView(
             MainComponent, new viewAnn.View(template: "<div></div>"));
         var compiler = createCompiler(
-            [createRenderProtoView()], [[rootProtoView], [createProtoView()]]);
+            [createRenderProtoView()], [rootProtoView, createProtoView()]);
         compiler.compileInHost(MainComponent).then((protoViewRef) {
           expect(internalProtoView(protoViewRef)).toBe(rootProtoView);
           async.done();
@@ -300,11 +309,18 @@ main() {
       var mainProtoView = createProtoView(
           [createComponentElementBinder(directiveResolver, NestedComponent)]);
       var nestedProtoView = createProtoView();
-      var compiler = createCompiler([
+      var renderPvDtos = [
         createRenderProtoView([createRenderComponentElementBinder(0)]),
         createRenderProtoView()
-      ], [[rootProtoView], [mainProtoView], [nestedProtoView]]);
+      ];
+      var compiler = createCompiler(
+          renderPvDtos, [rootProtoView, mainProtoView, nestedProtoView]);
       compiler.compileInHost(MainComponent).then((protoViewRef) {
+        expect(originalRenderProtoViewRefs(internalProtoView(protoViewRef)))
+            .toEqual([
+          rootProtoView.render,
+          [mainProtoView.render, [nestedProtoView.render]]
+        ]);
         expect(internalProtoView(protoViewRef).elementBinders[
             0].nestedProtoView).toBe(mainProtoView);
         expect(mainProtoView.elementBinders[0].nestedProtoView)
@@ -318,27 +334,31 @@ main() {
           MainComponent, new viewAnn.View(template: "<div></div>"));
       tplResolver.setView(
           NestedComponent, new viewAnn.View(template: "<div></div>"));
-      var mainProtoView = createProtoView([createViewportElementBinder(null)]);
       var viewportProtoView = createProtoView(
-          [createComponentElementBinder(directiveResolver, NestedComponent)]);
+          [createComponentElementBinder(directiveResolver, NestedComponent)],
+          renderApi.ViewType.EMBEDDED);
+      var mainProtoView =
+          createProtoView([createViewportElementBinder(viewportProtoView)]);
       var nestedProtoView = createProtoView();
-      var compiler = createCompiler([
+      var renderPvDtos = [
         createRenderProtoView([
           createRenderViewportElementBinder(createRenderProtoView(
               [createRenderComponentElementBinder(0)],
               renderApi.ViewType.EMBEDDED))
         ]),
         createRenderProtoView()
-      ], [
-        [rootProtoView],
-        [mainProtoView, viewportProtoView],
-        [nestedProtoView]
-      ]);
+      ];
+      var compiler = createCompiler(
+          renderPvDtos, [rootProtoView, mainProtoView, nestedProtoView]);
       compiler.compileInHost(MainComponent).then((protoViewRef) {
         expect(internalProtoView(protoViewRef).elementBinders[
             0].nestedProtoView).toBe(mainProtoView);
+        expect(originalRenderProtoViewRefs(internalProtoView(protoViewRef)))
+            .toEqual([rootProtoView.render, [mainProtoView.render, null]]);
         expect(viewportProtoView.elementBinders[0].nestedProtoView)
             .toBe(nestedProtoView);
+        expect(originalRenderProtoViewRefs(viewportProtoView))
+            .toEqual([viewportProtoView.render, [nestedProtoView.render]]);
         async.done();
       });
     }));
@@ -347,8 +367,8 @@ main() {
       tplResolver.setView(
           MainComponent, new viewAnn.View(template: "<div></div>"));
       var mainPv = createProtoView();
-      var compiler = createCompiler(
-          [createRenderProtoView()], [[rootProtoView], [mainPv]]);
+      var compiler =
+          createCompiler([createRenderProtoView([])], [rootProtoView, mainPv]);
       compiler.compileInHost(MainComponent).then((protoViewRef) {
         expect(internalProtoView(protoViewRef).elementBinders[
             0].nestedProtoView).toBe(mainPv);
@@ -370,7 +390,7 @@ main() {
       // create the compiler
       var compiler = new Compiler(reader, cache, tplResolver, cmpUrlMapper,
           new UrlResolver(), renderCompiler, protoViewFactory,
-          new FakeAppRootUrl());
+          new AppRootUrl("http://www.app.com"));
       compiler.compileInHost(MainComponent).then((protoViewRef) {
         // the test should have failed if the resolver was called, so we're good
         async.done();
@@ -393,7 +413,7 @@ main() {
         createRenderProtoView(),
         createRenderProtoView(),
         createRenderProtoView()
-      ], [[rootProtoView], [mainPv], [nestedPv], [rootProtoView2], [mainPv]]);
+      ], [rootProtoView, mainPv, nestedPv, rootProtoView2, mainPv]);
       compiler.compileInHost(MainComponent).then((protoViewRef) {
         expect(internalProtoView(protoViewRef).elementBinders[
                 0].nestedProtoView.elementBinders[0].nestedProtoView)
@@ -410,12 +430,13 @@ main() {
         (async) {
       tplResolver.setView(
           MainComponent, new viewAnn.View(template: "<div></div>"));
-      var renderProtoViewCompleter = PromiseWrapper.completer();
+      PromiseCompleter<renderApi.ProtoViewDto> renderProtoViewCompleter =
+          PromiseWrapper.completer();
       var expectedProtoView = createProtoView();
       var compiler = createCompiler([renderProtoViewCompleter.promise], [
-        [rootProtoView],
-        [rootProtoView],
-        [expectedProtoView]
+        rootProtoView,
+        rootProtoView,
+        expectedProtoView
       ]);
       var result = PromiseWrapper.all([
         compiler.compileInHost(MainComponent),
@@ -431,33 +452,95 @@ main() {
         async.done();
       });
     }));
-    it("should allow recursive components", inject([AsyncTestCompleter],
-        (async) {
+    it("should throw on unconditional recursive components", inject(
+        [AsyncTestCompleter], (async) {
       tplResolver.setView(
           MainComponent, new viewAnn.View(template: "<div></div>"));
       var mainProtoView = createProtoView(
           [createComponentElementBinder(directiveResolver, MainComponent)]);
       var compiler = createCompiler(
           [createRenderProtoView([createRenderComponentElementBinder(0)])], [
-        [rootProtoView],
-        [mainProtoView]
+        rootProtoView,
+        mainProtoView
       ]);
+      PromiseWrapper.catchError(compiler.compileInHost(MainComponent), (e) {
+        expect(() {
+          throw e;
+        }).toThrowError(
+            '''Unconditional component cycle in ${ stringify ( MainComponent )}''');
+        async.done();
+        return null;
+      });
+    }));
+    it("should allow recursive components that are connected via an embedded ProtoView",
+        inject([AsyncTestCompleter], (async) {
+      tplResolver.setView(
+          MainComponent, new viewAnn.View(template: "<div></div>"));
+      var viewportProtoView = createProtoView(
+          [createComponentElementBinder(directiveResolver, MainComponent)],
+          renderApi.ViewType.EMBEDDED);
+      var mainProtoView =
+          createProtoView([createViewportElementBinder(viewportProtoView)]);
+      var renderPvDtos = [
+        createRenderProtoView([
+          createRenderViewportElementBinder(createRenderProtoView(
+              [createRenderComponentElementBinder(0)],
+              renderApi.ViewType.EMBEDDED))
+        ]),
+        createRenderProtoView()
+      ];
+      var compiler =
+          createCompiler(renderPvDtos, [rootProtoView, mainProtoView]);
       compiler.compileInHost(MainComponent).then((protoViewRef) {
         expect(internalProtoView(protoViewRef).elementBinders[
             0].nestedProtoView).toBe(mainProtoView);
-        expect(mainProtoView.elementBinders[0].nestedProtoView)
-            .toBe(mainProtoView);
+        expect(mainProtoView.elementBinders[0].nestedProtoView.elementBinders[
+            0].nestedProtoView).toBe(mainProtoView);
+        // In case of a cycle, don't merge the embedded proto views into the component!
+        expect(originalRenderProtoViewRefs(internalProtoView(protoViewRef)))
+            .toEqual([rootProtoView.render, [mainProtoView.render, null]]);
+        expect(originalRenderProtoViewRefs(viewportProtoView))
+            .toEqual([viewportProtoView.render, [mainProtoView.render, null]]);
         async.done();
+      });
+    }));
+    it("should throw on recursive components that are connected via an embedded ProtoView with <ng-content>",
+        inject([AsyncTestCompleter], (async) {
+      tplResolver.setView(
+          MainComponent, new viewAnn.View(template: "<div></div>"));
+      var viewportProtoView = createProtoView(
+          [createComponentElementBinder(directiveResolver, MainComponent)],
+          renderApi.ViewType.EMBEDDED, true);
+      var mainProtoView =
+          createProtoView([createViewportElementBinder(viewportProtoView)]);
+      var renderPvDtos = [
+        createRenderProtoView([
+          createRenderViewportElementBinder(createRenderProtoView(
+              [createRenderComponentElementBinder(0)],
+              renderApi.ViewType.EMBEDDED))
+        ]),
+        createRenderProtoView()
+      ];
+      var compiler =
+          createCompiler(renderPvDtos, [rootProtoView, mainProtoView]);
+      PromiseWrapper.catchError(compiler.compileInHost(MainComponent), (e) {
+        expect(() {
+          throw e;
+        }).toThrowError(
+            '''<ng-content> is used within the recursive path of ${ stringify ( MainComponent )}''');
+        async.done();
+        return null;
       });
     }));
     it("should create host proto views", inject([AsyncTestCompleter], (async) {
       tplResolver.setView(
           MainComponent, new viewAnn.View(template: "<div></div>"));
       var rootProtoView = createProtoView(
-          [createComponentElementBinder(directiveResolver, MainComponent)]);
+          [createComponentElementBinder(directiveResolver, MainComponent)],
+          renderApi.ViewType.HOST);
       var mainProtoView = createProtoView();
       var compiler = createCompiler(
-          [createRenderProtoView()], [[rootProtoView], [mainProtoView]]);
+          [createRenderProtoView()], [rootProtoView, mainProtoView]);
       compiler.compileInHost(MainComponent).then((protoViewRef) {
         expect(internalProtoView(protoViewRef)).toBe(rootProtoView);
         expect(rootProtoView.elementBinders[0].nestedProtoView)
@@ -476,8 +559,13 @@ DirectiveBinding createDirectiveBinding(directiveResolver, type) {
   var annotation = directiveResolver.resolve(type);
   return DirectiveBinding.createFromType(type, annotation);
 }
-AppProtoView createProtoView([elementBinders = null]) {
-  var pv = new AppProtoView(null, null, new Map(), null);
+AppProtoView createProtoView([elementBinders = null,
+    renderApi.ViewType type = null, bool isEmbeddedFragment = false]) {
+  if (isBlank(type)) {
+    type = renderApi.ViewType.COMPONENT;
+  }
+  var pv = new AppProtoView(type, isEmbeddedFragment,
+      new renderApi.RenderProtoViewRef(), null, null, new Map(), null);
   if (isBlank(elementBinders)) {
     elementBinders = [];
   }
@@ -501,7 +589,10 @@ renderApi.ProtoViewDto createRenderProtoView(
   if (isBlank(elementBinders)) {
     elementBinders = [];
   }
-  return new renderApi.ProtoViewDto(elementBinders: elementBinders, type: type);
+  return new renderApi.ProtoViewDto(
+      elementBinders: elementBinders,
+      type: type,
+      render: new renderApi.RenderProtoViewRef());
 }
 renderApi.ElementBinder createRenderComponentElementBinder(directiveIndex) {
   return new renderApi.ElementBinder(
@@ -514,7 +605,8 @@ renderApi.ElementBinder createRenderViewportElementBinder(nestedProtoView) {
 }
 AppProtoView createRootProtoView(directiveResolver, type) {
   return createProtoView(
-      [createComponentElementBinder(directiveResolver, type)]);
+      [createComponentElementBinder(directiveResolver, type)],
+      renderApi.ViewType.HOST);
 }
 @Component(selector: "main-comp")
 class MainComponent {}
@@ -539,7 +631,7 @@ class DirectiveWithBind {}
 class DirectiveWithAttributes {
   DirectiveWithAttributes(@Attribute("someAttr") String someAttr) {}
 }
-@proxy
+@proxy()
 class SpyRenderCompiler extends SpyObject implements RenderCompiler {
   SpyRenderCompiler() : super(RenderCompiler) {
     /* super call moved to initializer */;
@@ -548,18 +640,13 @@ class SpyRenderCompiler extends SpyObject implements RenderCompiler {
     return super.noSuchMethod(m);
   }
 }
-@proxy
+@proxy()
 class SpyDirectiveResolver extends SpyObject implements DirectiveResolver {
   SpyDirectiveResolver() : super(DirectiveResolver) {
     /* super call moved to initializer */;
   }
   noSuchMethod(m) {
     return super.noSuchMethod(m);
-  }
-}
-class FakeAppRootUrl extends AppRootUrl {
-  get value {
-    return "http://www.app.com";
   }
 }
 class FakeViewResolver extends ViewResolver {
@@ -578,7 +665,7 @@ class FakeViewResolver extends ViewResolver {
   }
 }
 class FakeProtoViewFactory extends ProtoViewFactory {
-  List<List<AppProtoView>> results;
+  List<AppProtoView> results;
   List<List<dynamic>> requests;
   FakeProtoViewFactory(this.results) : super(null) {
     /* super call moved to initializer */;
@@ -588,6 +675,28 @@ class FakeProtoViewFactory extends ProtoViewFactory {
       renderApi.ProtoViewDto renderProtoView,
       List<DirectiveBinding> directives) {
     this.requests.add([componentBinding, renderProtoView, directives]);
-    return ListWrapper.removeAt(this.results, 0);
+    return collectEmbeddedPvs(ListWrapper.removeAt(this.results, 0));
   }
+}
+class MergedRenderProtoViewRef extends renderApi.RenderProtoViewRef {
+  List<renderApi.RenderProtoViewRef> originals;
+  MergedRenderProtoViewRef(this.originals) : super() {
+    /* super call moved to initializer */;
+  }
+}
+originalRenderProtoViewRefs(AppProtoView appProtoView) {
+  return ((appProtoView.mergeMapping.renderProtoViewRef as MergedRenderProtoViewRef)).originals;
+}
+List<AppProtoView> collectEmbeddedPvs(AppProtoView pv,
+    [List<AppProtoView> target = null]) {
+  if (isBlank(target)) {
+    target = [];
+  }
+  target.add(pv);
+  pv.elementBinders.forEach((elementBinder) {
+    if (elementBinder.hasEmbeddedProtoView()) {
+      collectEmbeddedPvs(elementBinder.nestedProtoView, target);
+    }
+  });
+  return target;
 }

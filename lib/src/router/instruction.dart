@@ -21,15 +21,15 @@ class Instruction {
   String capturedUrl;
   PathRecognizer _recognizer;
   Instruction child;
+  Map<String, dynamic> _params;
   // "capturedUrl" is the part of the URL captured by this instruction
 
   // "accumulatedUrl" is the part of the URL captured by this instruction and all children
   String accumulatedUrl;
   bool reuse = false;
   num specificity;
-  Map<String, String> _params;
   Instruction(this.component, this.capturedUrl, this._recognizer,
-      [this.child = null]) {
+      [this.child = null, this._params = null]) {
     this.accumulatedUrl = capturedUrl;
     this.specificity = _recognizer.specificity;
     if (isPresent(child)) {

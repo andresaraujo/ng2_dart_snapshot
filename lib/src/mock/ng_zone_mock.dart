@@ -6,10 +6,10 @@ class MockNgZone extends NgZone {
   MockNgZone() : super(enableLongStackTrace: false) {
     /* super call moved to initializer */;
   }
-  dynamic run(fn) {
+  dynamic run(Function fn) {
     return fn();
   }
-  dynamic runOutsideAngular(fn) {
+  dynamic runOutsideAngular(Function fn) {
     return fn();
   }
 }

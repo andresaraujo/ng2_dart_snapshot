@@ -98,11 +98,16 @@ final _keyCodeToKeyMap = const {
 class BrowserDomAdapter extends GenericBrowserDomAdapter {
   js.JsFunction _setProperty;
   js.JsFunction _getProperty;
+  js.JsFunction _hasProperty;
+  Map<String, bool> _hasPropertyCache;
   BrowserDomAdapter() {
-    _setProperty = js.context.callMethod('eval',
-        ['(function(el, prop, value) { if (prop in el) el[prop] = value; })']);
+    _hasPropertyCache = new Map();
+    _setProperty = js.context.callMethod(
+        'eval', ['(function(el, prop, value) { el[prop] = value; })']);
     _getProperty = js.context.callMethod(
         'eval', ['(function(el, prop) { return el[prop]; })']);
+    _hasProperty = js.context.callMethod(
+        'eval', ['(function(el, prop) { return prop in el; })']);
   }
   static void makeCurrent() {
     setRootDomAdapter(new BrowserDomAdapter());
@@ -114,8 +119,17 @@ class BrowserDomAdapter extends GenericBrowserDomAdapter {
     return true;
   }
 
-  void setProperty(Element element, String name, Object value) =>
+  void setProperty(Element element, String name, Object value) {
+    var cacheKey = "${element.tagName}.${name}";
+    var hasProperty = this._hasPropertyCache[cacheKey];
+    if (hasProperty == null) {
+      hasProperty = this._hasProperty.apply([element, name]);
+      this._hasPropertyCache[cacheKey] = hasProperty;
+    }
+    if (hasProperty) {
       _setProperty.apply([element, name, value]);
+    }
+  }
 
   getProperty(Element element, String name) =>
       _getProperty.apply([element, name]);
@@ -126,6 +140,18 @@ class BrowserDomAdapter extends GenericBrowserDomAdapter {
   // TODO(tbosch): move this into a separate environment class once we have it
   logError(error) {
     window.console.error(error);
+  }
+
+  log(error) {
+    window.console.log(error);
+  }
+
+  logGroup(error) {
+    window.console.group(error);
+  }
+
+  logGroupEnd() {
+    window.console.groupEnd();
   }
 
   @override
@@ -211,6 +237,9 @@ class BrowserDomAdapter extends GenericBrowserDomAdapter {
   bool getChecked(InputElement el) => el.checked;
   void setChecked(InputElement el, bool isChecked) {
     el.checked = isChecked;
+  }
+  Comment createComment(String text) {
+    return new Comment(text);
   }
   TemplateElement createTemplate(String html) {
     var t = new TemplateElement();
@@ -315,6 +344,9 @@ class BrowserDomAdapter extends GenericBrowserDomAdapter {
   Node importIntoDoc(Node node) {
     return document.importNode(node, true);
   }
+  Node adoptNode(Node node) {
+    return document.adoptNode(node);
+  }
   bool isPageRule(CssRule rule) => rule is CssPageRule;
   bool isStyleRule(CssRule rule) => rule is CssStyleRule;
   bool isMediaRule(CssRule rule) => rule is CssMediaRule;
@@ -344,8 +376,11 @@ class BrowserDomAdapter extends GenericBrowserDomAdapter {
     return window.location;
   }
   getBaseHref() {
-    var uri = document.baseUri;
-    var baseUri = Uri.parse(uri);
+    var href = getBaseElementHref();
+    if (href == null) {
+      return null;
+    }
+    var baseUri = Uri.parse(href);
     return baseUri.path;
   }
   String getUserAgent() {
@@ -361,4 +396,15 @@ class BrowserDomAdapter extends GenericBrowserDomAdapter {
   setGlobalVar(String name, value) {
     js.context[name] = value;
   }
+}
+
+var baseElement = null;
+String getBaseElementHref() {
+  if (baseElement == null) {
+    baseElement = document.querySelector('base');
+    if (baseElement == null) {
+      return null;
+    }
+  }
+  return baseElement.getAttribute('href');
 }

@@ -81,8 +81,6 @@ class Query extends DependencyMetadata {
  * Specifies that a {@link QueryList} should be injected.
  *
  * See {@link QueryList} for usage and example.
- *
- * @exportedAs angular2/annotations
  */
 class ViewQuery extends Query {
   const ViewQuery(dynamic /* Type | String */ _selector, {descendants: false})

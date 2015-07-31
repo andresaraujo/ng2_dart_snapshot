@@ -10,11 +10,12 @@ import "package:angular2/src/core/annotations_impl/view.dart" show View;
 import "package:angular2/src/core/compiler/view_resolver.dart"
     show ViewResolver;
 import "package:angular2/src/core/compiler/view.dart" show AppView;
-import "package:angular2/src/core/compiler/view_ref.dart" show internalView;
+import "package:angular2/src/core/compiler/view_ref.dart"
+    show internalView, ViewRef;
 import "package:angular2/src/core/compiler/dynamic_component_loader.dart"
     show DynamicComponentLoader, ComponentRef;
 import "utils.dart" show el;
-import "package:angular2/src/render/dom/dom_renderer.dart" show DOCUMENT_TOKEN;
+import "package:angular2/src/render/render.dart" show DOCUMENT_TOKEN;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
 import "package:angular2/src/debug/debug_element.dart" show DebugElement;
 
@@ -22,9 +23,10 @@ class RootTestComponent extends DebugElement {
   ComponentRef _componentRef;
   AppView _componentParentView;
   RootTestComponent(ComponentRef componentRef)
-      : super(internalView(componentRef.hostView), 0) {
+      : super(internalView((componentRef.hostView as ViewRef)), 0) {
     /* super call moved to initializer */;
-    this._componentParentView = internalView(componentRef.hostView);
+    this._componentParentView =
+        internalView((componentRef.hostView as ViewRef));
     this._componentRef = componentRef;
   }
   void detectChanges() {

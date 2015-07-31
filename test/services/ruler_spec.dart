@@ -53,7 +53,7 @@ main() {
     }));
   });
 }
-@proxy
+@proxy()
 class SpyElementRef extends SpyObject implements ElementRef {
   var nativeElement;
   SpyElementRef() : super(ElementRef) {
@@ -63,7 +63,7 @@ class SpyElementRef extends SpyObject implements ElementRef {
     return super.noSuchMethod(m);
   }
 }
-@proxy
+@proxy()
 class SpyDomAdapter extends SpyObject implements DomAdapter {
   SpyDomAdapter() : super(DomAdapter) {
     /* super call moved to initializer */;

@@ -23,7 +23,6 @@ import "package:angular2/di.dart"
         AbstractBindingError,
         CyclicDependencyError,
         resolveForwardRef,
-        VisibilityMetadata,
         DependencyProvider;
 import "package:angular2/src/di/injector.dart"
     show InjectorInlineStrategy, InjectorDynamicStrategy, BindingWithVisibility;
@@ -33,11 +32,11 @@ import "view.dart" as viewModule;
 import "view_manager.dart" as avmModule;
 import "view_container_ref.dart" show ViewContainerRef;
 import "element_ref.dart" show ElementRef;
-import "view_ref.dart" show ProtoViewRef, ViewRef;
+import "template_ref.dart" show TemplateRef;
 import "package:angular2/src/core/annotations_impl/annotations.dart"
     show Directive, Component, LifecycleEvent;
 import "directive_lifecycle_reflector.dart" show hasLifecycleHook;
-import "package:angular2/change_detection.dart"
+import "package:angular2/src/change_detection/change_detection.dart"
     show ChangeDetector, ChangeDetectorRef, Pipes;
 import "query_list.dart" show QueryList;
 import "package:angular2/src/reflection/reflection.dart" show reflector;
@@ -46,14 +45,14 @@ import "package:angular2/src/render/api.dart" show DirectiveMetadata;
 var _staticKeys;
 class StaticKeys {
   num viewManagerId;
-  num protoViewId;
+  num templateRefId;
   num viewContainerId;
   num changeDetectorRefId;
   num elementRefId;
   Key pipesKey;
   StaticKeys() {
     this.viewManagerId = Key.get(avmModule.AppViewManager).id;
-    this.protoViewId = Key.get(ProtoViewRef).id;
+    this.templateRefId = Key.get(TemplateRef).id;
     this.viewContainerId = Key.get(ViewContainerRef).id;
     this.changeDetectorRefId = Key.get(ChangeDetectorRef).id;
     this.elementRefId = Key.get(ElementRef).id;
@@ -151,9 +150,11 @@ class TreeNode<T extends TreeNode<dynamic>> {
 class DirectiveDependency extends Dependency {
   String attributeName;
   Query queryDecorator;
-  DirectiveDependency(Key key, bool optional, dynamic visibility,
-      List<dynamic> properties, this.attributeName, this.queryDecorator)
-      : super(key, optional, visibility, properties) {
+  DirectiveDependency(Key key, bool optional, Object lowerBoundVisibility,
+      Object upperBoundVisibility, List<dynamic> properties, this.attributeName,
+      this.queryDecorator)
+      : super(key, optional, lowerBoundVisibility, upperBoundVisibility,
+          properties) {
     /* super call moved to initializer */;
     this._verify();
   }
@@ -165,8 +166,9 @@ class DirectiveDependency extends Dependency {
         "A directive injectable can contain only one of the following @Attribute or @Query.");
   }
   static Dependency createFrom(Dependency d) {
-    return new DirectiveDependency(d.key, d.optional, d.visibility,
-        d.properties, DirectiveDependency._attributeName(d.properties),
+    return new DirectiveDependency(d.key, d.optional, d.lowerBoundVisibility,
+        d.upperBoundVisibility, d.properties,
+        DirectiveDependency._attributeName(d.properties),
         DirectiveDependency._query(d.properties));
   }
   static String _attributeName(properties) {
@@ -178,11 +180,11 @@ class DirectiveDependency extends Dependency {
   }
 }
 class DirectiveBinding extends ResolvedBinding {
-  List<ResolvedBinding> resolvedHostInjectables;
-  List<ResolvedBinding> resolvedViewInjectables;
+  List<ResolvedBinding> resolvedBindings;
+  List<ResolvedBinding> resolvedViewBindings;
   DirectiveMetadata metadata;
   DirectiveBinding(Key key, Function factory, List<Dependency> dependencies,
-      this.resolvedHostInjectables, this.resolvedViewInjectables, this.metadata)
+      this.resolvedBindings, this.resolvedViewBindings, this.metadata)
       : super(key, factory, dependencies) {
     /* super call moved to initializer */;
   }
@@ -217,10 +219,11 @@ class DirectiveBinding extends ResolvedBinding {
     }
     var rb = binding.resolve();
     var deps = ListWrapper.map(rb.dependencies, DirectiveDependency.createFrom);
-    var resolvedHostInjectables =
-        isPresent(ann.hostInjector) ? Injector.resolve(ann.hostInjector) : [];
-    var resolvedViewInjectables = ann is Component &&
-        isPresent(ann.viewInjector) ? Injector.resolve(ann.viewInjector) : [];
+    var resolvedBindings =
+        isPresent(ann.bindings) ? Injector.resolve(ann.bindings) : [];
+    var resolvedViewBindings = ann is Component && isPresent(ann.viewBindings)
+        ? Injector.resolve(ann.viewBindings)
+        : [];
     var metadata = DirectiveMetadata.create(
         id: stringify(rb.key.token),
         type: ann is Component
@@ -245,8 +248,8 @@ class DirectiveBinding extends ResolvedBinding {
             LifecycleEvent.onAllChangesDone, rb.key.token, ann),
         changeDetection: ann is Component ? ann.changeDetection : null,
         exportAs: ann.exportAs);
-    return new DirectiveBinding(rb.key, rb.factory, deps,
-        resolvedHostInjectables, resolvedViewInjectables, metadata);
+    return new DirectiveBinding(rb.key, rb.factory, deps, resolvedBindings,
+        resolvedViewBindings, metadata);
   }
   static _readAttributes(deps) {
     var readAttributes = [];
@@ -266,8 +269,10 @@ class DirectiveBinding extends ResolvedBinding {
 class PreBuiltObjects {
   avmModule.AppViewManager viewManager;
   viewModule.AppView view;
-  viewModule.AppProtoView protoView;
-  PreBuiltObjects(this.viewManager, this.view, this.protoView) {}
+  ElementRef elementRef;
+  TemplateRef templateRef;
+  PreBuiltObjects(
+      this.viewManager, this.view, this.elementRef, this.templateRef) {}
 }
 class EventEmitterAccessor {
   String eventName;
@@ -340,10 +345,9 @@ class ProtoElementInjector {
     ProtoElementInjector._createDirectiveBindingWithVisibility(
         bindings, bd, firstBindingIsComponent);
     if (firstBindingIsComponent) {
-      ProtoElementInjector._createViewInjectorBindingWithVisibility(
-          bindings, bd);
+      ProtoElementInjector._createViewBindingsWithVisibility(bindings, bd);
     }
-    ProtoElementInjector._createHostInjectorBindingWithVisibility(
+    ProtoElementInjector._createBindingsWithVisibility(
         bindings, bd, firstBindingIsComponent);
     return new ProtoElementInjector(parent, index, bd, distanceToParent,
         firstBindingIsComponent, directiveVariableBindings);
@@ -356,11 +360,10 @@ class ProtoElementInjector {
           firstBindingIsComponent, dirBinding, dirBindings, dirBinding));
     });
   }
-  static _createHostInjectorBindingWithVisibility(
-      List<ResolvedBinding> dirBindings, List<BindingWithVisibility> bd,
-      bool firstBindingIsComponent) {
+  static _createBindingsWithVisibility(List<ResolvedBinding> dirBindings,
+      List<BindingWithVisibility> bd, bool firstBindingIsComponent) {
     ListWrapper.forEach(dirBindings, (dirBinding) {
-      ListWrapper.forEach(dirBinding.resolvedHostInjectables, (b) {
+      ListWrapper.forEach(dirBinding.resolvedBindings, (b) {
         bd.add(ProtoElementInjector._createBindingWithVisibility(
             firstBindingIsComponent, dirBinding, dirBindings, b));
       });
@@ -373,17 +376,17 @@ class ProtoElementInjector {
     return new BindingWithVisibility(
         binding, isComponent ? PUBLIC_AND_PRIVATE : PUBLIC);
   }
-  static _createViewInjectorBindingWithVisibility(
+  static _createViewBindingsWithVisibility(
       List<ResolvedBinding> bindings, List<BindingWithVisibility> bd) {
     var db = (bindings[0] as DirectiveBinding);
-    ListWrapper.forEach(db.resolvedViewInjectables,
+    ListWrapper.forEach(db.resolvedViewBindings,
         (b) => bd.add(new BindingWithVisibility(b, PRIVATE)));
   }
   ProtoElementInjector(this.parent, this.index, List<BindingWithVisibility> bwv,
       this.distanceToParent, this._firstBindingIsComponent,
       this.directiveVariableBindings) {
     var length = bwv.length;
-    this.protoInjector = new ProtoInjector(bwv, distanceToParent);
+    this.protoInjector = new ProtoInjector(bwv);
     this.eventEmitterAccessors = ListWrapper.createFixedSize(length);
     this.hostActionAccessors = ListWrapper.createFixedSize(length);
     for (var i = 0; i < length; ++i) {
@@ -404,6 +407,12 @@ class ProtoElementInjector {
     return this.protoInjector.getBindingAtIndex(index);
   }
 }
+class _Context {
+  dynamic element;
+  dynamic componentElement;
+  dynamic injector;
+  _Context(this.element, this.componentElement, this.injector) {}
+}
 class ElementInjector extends TreeNode<ElementInjector>
     implements DependencyProvider {
   ProtoElementInjector _proto;
@@ -420,7 +429,8 @@ class ElementInjector extends TreeNode<ElementInjector>
   _ElementInjectorStrategy _strategy;
   ElementInjector(this._proto, ElementInjector parent) : super(parent) {
     /* super call moved to initializer */;
-    this._injector = new Injector(this._proto.protoInjector, null, this);
+    this._injector = new Injector(
+        this._proto.protoInjector, null, this, () => this._debugContext());
     // we couple ourselves to the injector strategy to avoid polymoprhic calls
     var injectorStrategy = (this._injector.internalStrategy as dynamic);
     this._strategy = injectorStrategy is InjectorInlineStrategy
@@ -452,7 +462,7 @@ class ElementInjector extends TreeNode<ElementInjector>
       PreBuiltObjects preBuiltObjects) {
     this._host = host;
     this._preBuiltObjects = preBuiltObjects;
-    this._reattachInjectors(imperativelyCreatedInjector, host);
+    this._reattachInjectors(imperativelyCreatedInjector);
     this._strategy.hydrate();
     if (isPresent(host)) {
       this._addViewQueries(host);
@@ -461,74 +471,51 @@ class ElementInjector extends TreeNode<ElementInjector>
     this._addVarBindingsToQueries();
     this.hydrated = true;
   }
-  void _reattachInjectors(
-      Injector imperativelyCreatedInjector, ElementInjector host) {
-    if (isPresent(this._parent)) {
-      this._reattachInjector(this._injector, this._parent._injector, false);
-    } else {
-      // This injector is at the boundary.
-
-      //
-
-      // The injector tree we are assembling:
-
-      //
-
-      // host._injector (only if present)
-
-      //   |
-
-      //   |boundary
-
-      //   |
-
-      // imperativelyCreatedInjector (only if present)
-
-      //   |
-
-      //   |boundary
-
-      //   |
-
-      // this._injector
-
-      //
-
-      // host._injector (only if present)
-
-      //   |
-
-      //   |boundary
-
-      //   |
-
-      // imperativelyCreatedInjector (only if present)
-      if (isPresent(imperativelyCreatedInjector) && isPresent(host)) {
-        this._reattachInjector(
-            imperativelyCreatedInjector, host._injector, true);
-      }
-      // host._injector OR imperativelyCreatedInjector OR null
-
-      //   |
-
-      //   |boundary
-
-      //   |
-
-      // this._injector
-      var parent =
-          this._closestBoundaryInjector(imperativelyCreatedInjector, host);
-      this._reattachInjector(this._injector, parent, true);
-    }
+  dynamic _debugContext() {
+    var p = this._preBuiltObjects;
+    var index = p.elementRef.boundElementIndex - p.view.elementOffset;
+    var c = this._preBuiltObjects.view.getDebugContext(index, null);
+    return isPresent(c)
+        ? new _Context(c.element, c.componentElement, c.injector)
+        : null;
   }
-  Injector _closestBoundaryInjector(
-      Injector imperativelyCreatedInjector, ElementInjector host) {
-    if (isPresent(imperativelyCreatedInjector)) {
-      return imperativelyCreatedInjector;
-    } else if (isPresent(host)) {
-      return host._injector;
+  void _reattachInjectors(Injector imperativelyCreatedInjector) {
+    // Dynamically-loaded component in the template. Not a root ElementInjector.
+    if (isPresent(this._parent)) {
+      if (isPresent(imperativelyCreatedInjector)) {
+        // The imperative injector is similar to having an element between
+
+        // the dynamic-loaded component and its parent => no boundaries.
+        this._reattachInjector(
+            this._injector, imperativelyCreatedInjector, false);
+        this._reattachInjector(
+            imperativelyCreatedInjector, this._parent._injector, false);
+      } else {
+        this._reattachInjector(this._injector, this._parent._injector, false);
+      }
+    } else if (isPresent(this._host)) {
+      // The imperative injector is similar to having an element between
+
+      // the dynamic-loaded component and its parent => no boundary between
+
+      // the component and imperativelyCreatedInjector.
+
+      // But since it is a root ElementInjector, we need to create a boundary
+
+      // between imperativelyCreatedInjector and _host.
+      if (isPresent(imperativelyCreatedInjector)) {
+        this._reattachInjector(
+            this._injector, imperativelyCreatedInjector, false);
+        this._reattachInjector(
+            imperativelyCreatedInjector, this._host._injector, true);
+      } else {
+        this._reattachInjector(this._injector, this._host._injector, true);
+      }
     } else {
-      return null;
+      if (isPresent(imperativelyCreatedInjector)) {
+        this._reattachInjector(
+            this._injector, imperativelyCreatedInjector, true);
+      }
     }
   }
   _reattachInjector(
@@ -549,7 +536,7 @@ class ElementInjector extends TreeNode<ElementInjector>
         ? this.getDirectiveAtIndex((index as num))
         : this.getElementRef();
   }
-  dynamic get(token) {
+  dynamic get(dynamic token) {
     return this._injector.get(token);
   }
   bool hasDirective(Type type) {
@@ -567,8 +554,11 @@ class ElementInjector extends TreeNode<ElementInjector>
   dynamic getComponent() {
     return this._strategy.getComponent();
   }
+  Injector getInjector() {
+    return this._injector;
+  }
   ElementRef getElementRef() {
-    return this._preBuiltObjects.view.elementRefs[this._proto.index];
+    return this._preBuiltObjects.elementRef;
   }
   ViewContainerRef getViewContainerRef() {
     return new ViewContainerRef(
@@ -584,7 +574,9 @@ class ElementInjector extends TreeNode<ElementInjector>
       Injector injector, ResolvedBinding binding, Dependency dep) {
     Key key = dep.key;
     if (!(dep is DirectiveDependency)) return undefinedValue;
+    if (!(binding is DirectiveBinding)) return undefinedValue;
     var dirDep = (dep as DirectiveDependency);
+    var dirBin = (binding as DirectiveBinding);
     var staticKeys = StaticKeys.instance();
     if (identical(key.id,
         staticKeys.viewManagerId)) return this._preBuiltObjects.viewManager;
@@ -592,9 +584,16 @@ class ElementInjector extends TreeNode<ElementInjector>
     if (isPresent(dirDep.queryDecorator)) return this
         ._findQuery(dirDep.queryDecorator).list;
     if (identical(dirDep.key.id, StaticKeys.instance().changeDetectorRefId)) {
-      var componentView =
-          this._preBuiltObjects.view.componentChildViews[this._proto.index];
-      return componentView.changeDetector.ref;
+      // We provide the component's view change detector to components and
+
+      // the surrounding component's change detector to directives.
+      if (identical(dirBin.metadata.type, DirectiveMetadata.COMPONENT_TYPE)) {
+        var componentView = this._preBuiltObjects.view
+            .getNestedView(this._preBuiltObjects.elementRef.boundElementIndex);
+        return componentView.changeDetector.ref;
+      } else {
+        return this._preBuiltObjects.view.changeDetector.ref;
+      }
     }
     if (identical(dirDep.key.id, StaticKeys.instance().elementRefId)) {
       return this.getElementRef();
@@ -602,14 +601,14 @@ class ElementInjector extends TreeNode<ElementInjector>
     if (identical(dirDep.key.id, StaticKeys.instance().viewContainerId)) {
       return this.getViewContainerRef();
     }
-    if (identical(dirDep.key.id, StaticKeys.instance().protoViewId)) {
-      if (isBlank(this._preBuiltObjects.protoView)) {
+    if (identical(dirDep.key.id, StaticKeys.instance().templateRefId)) {
+      if (isBlank(this._preBuiltObjects.templateRef)) {
         if (dirDep.optional) {
           return null;
         }
-        throw new NoBindingError(dirDep.key);
+        throw new NoBindingError(null, dirDep.key);
       }
-      return new ProtoViewRef(this._preBuiltObjects.protoView);
+      return this._preBuiltObjects.templateRef;
     }
     return undefinedValue;
   }
@@ -630,12 +629,15 @@ class ElementInjector extends TreeNode<ElementInjector>
     }
   }
   void _addViewQueries(ElementInjector host) {
-    if (isPresent(host._query0) && host._query0.originator == host) this
-        ._addViewQuery(host._query0);
-    if (isPresent(host._query1) && host._query1.originator == host) this
-        ._addViewQuery(host._query1);
-    if (isPresent(host._query2) && host._query2.originator == host) this
-        ._addViewQuery(host._query2);
+    if (isPresent(host._query0) &&
+        host._query0.originator == host &&
+        host._query0.query.isViewQuery) this._addViewQuery(host._query0);
+    if (isPresent(host._query1) &&
+        host._query1.originator == host &&
+        host._query1.query.isViewQuery) this._addViewQuery(host._query1);
+    if (isPresent(host._query2) &&
+        host._query2.originator == host &&
+        host._query2.query.isViewQuery) this._addViewQuery(host._query2);
   }
   void _addViewQuery(QueryRef queryRef) {
     // TODO(rado): Replace this.parent check with distanceToParent = 1 when
@@ -747,7 +749,12 @@ class ElementInjector extends TreeNode<ElementInjector>
       queriesToUpdate.add(this.parent._query2);
     }
     this.remove();
-    ListWrapper.forEach(queriesToUpdate, (q) => q.update());
+    // TODO(rado): update should work on view queries too, however currently it
+
+    // is not implemented, so we filter to non-view queries.
+    var nonViewQueries =
+        ListWrapper.filter(queriesToUpdate, (q) => !q.query.isViewQuery);
+    ListWrapper.forEach(nonViewQueries, (q) => q.update());
   }
   void _pruneQueryFromTree(QueryRef query) {
     this._removeQueryRef(query);
@@ -828,7 +835,7 @@ class ElementInjectorInlineStrategy implements _ElementInjectorStrategy {
   void hydrate() {
     var i = this.injectorStrategy;
     var p = i.protoStrategy;
-    i.resetContructionCounter();
+    i.resetConstructionCounter();
     if (p.binding0 is DirectiveBinding &&
         isPresent(p.keyId0) &&
         identical(i.obj0, undefinedValue)) i.obj0 =

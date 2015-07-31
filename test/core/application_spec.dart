@@ -20,10 +20,11 @@ import "package:angular2/annotations.dart" show Component, Directive, View;
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
 import "package:angular2/src/facade/async.dart" show PromiseWrapper;
 import "package:angular2/di.dart" show bind, Inject, Injector;
-import "package:angular2/src/core/life_cycle/life_cycle.dart" show LifeCycle;
+import "package:angular2/core.dart" show LifeCycle;
+import "package:angular2/src/core/exception_handler.dart" show ExceptionHandler;
 import "package:angular2/src/core/testability/testability.dart"
     show Testability, TestabilityRegistry;
-import "package:angular2/src/render/dom/dom_renderer.dart" show DOCUMENT_TOKEN;
+import "package:angular2/src/render/render.dart" show DOCUMENT_TOKEN;
 
 @Component(selector: "hello-app")
 @View(template: "{{greeting}} world!")
@@ -34,7 +35,7 @@ class HelloRootCmp {
   }
 }
 @Component(selector: "hello-app")
-@View(template: "before: <content></content> after: done")
+@View(template: "before: <ng-content></ng-content> after: done")
 class HelloRootCmpContent {
   HelloRootCmpContent() {}
 }
@@ -66,28 +67,35 @@ class HelloRootCmp4 {
 class HelloRootMissingTemplate {}
 @Directive(selector: "hello-app")
 class HelloRootDirectiveIsNotCmp {}
+class _ArrayLogger {
+  List<dynamic> res = [];
+  void log(dynamic s) {
+    this.res.add(s);
+  }
+  void logGroup(dynamic s) {
+    this.res.add(s);
+  }
+  logGroupEnd() {}
+}
 main() {
   var fakeDoc, el, el2, testBindings, lightDom;
-  beforeEach(() {
-    fakeDoc = DOM.createHtmlDocument();
-    el = DOM.createElement("hello-app", fakeDoc);
-    el2 = DOM.createElement("hello-app-2", fakeDoc);
-    lightDom = DOM.createElement("light-dom-el", fakeDoc);
-    DOM.appendChild(fakeDoc.body, el);
-    DOM.appendChild(fakeDoc.body, el2);
-    DOM.appendChild(el, lightDom);
-    DOM.setText(lightDom, "loading");
-    testBindings = [bind(DOCUMENT_TOKEN).toValue(fakeDoc)];
-  });
   describe("bootstrap factory method", () {
+    beforeEach(() {
+      fakeDoc = DOM.createHtmlDocument();
+      el = DOM.createElement("hello-app", fakeDoc);
+      el2 = DOM.createElement("hello-app-2", fakeDoc);
+      lightDom = DOM.createElement("light-dom-el", fakeDoc);
+      DOM.appendChild(fakeDoc.body, el);
+      DOM.appendChild(fakeDoc.body, el2);
+      DOM.appendChild(el, lightDom);
+      DOM.setText(lightDom, "loading");
+      testBindings = [bind(DOCUMENT_TOKEN).toValue(fakeDoc)];
+    });
     it("should throw if bootstrapped Directive is not a Component", inject(
         [AsyncTestCompleter], (async) {
-      var refPromise = bootstrap(HelloRootDirectiveIsNotCmp, testBindings,
-          (e, t) {
-        throw e;
-      });
-      PromiseWrapper.then(refPromise, null, (reason) {
-        expect(reason.message).toContain(
+      var refPromise = bootstrap(HelloRootDirectiveIsNotCmp, [testBindings]);
+      PromiseWrapper.then(refPromise, null, (exception) {
+        expect(exception).toContainError(
             '''Could not load \'${ stringify ( HelloRootDirectiveIsNotCmp )}\' because it is not a component.''');
         async.done();
         return null;
@@ -95,9 +103,11 @@ main() {
     }));
     it("should throw if no element is found", inject([AsyncTestCompleter],
         (async) {
-      var refPromise = bootstrap(HelloRootCmp, [], (e, t) {
-        throw e;
-      });
+      var logger = new _ArrayLogger();
+      var exceptionHandler =
+          new ExceptionHandler(logger, IS_DARTIUM ? false : true);
+      var refPromise = bootstrap(
+          HelloRootCmp, [bind(ExceptionHandler).toValue(exceptionHandler)]);
       PromiseWrapper.then(refPromise, null, (reason) {
         expect(reason.message)
             .toContain("The selector \"hello-app\" did not match any elements");
@@ -105,6 +115,22 @@ main() {
         return null;
       });
     }));
+    if (DOM.supportsDOMEvents()) {
+      it("should invoke the default exception handler when bootstrap fails",
+          inject([AsyncTestCompleter], (async) {
+        var logger = new _ArrayLogger();
+        var exceptionHandler =
+            new ExceptionHandler(logger, IS_DARTIUM ? false : true);
+        var refPromise = bootstrap(
+            HelloRootCmp, [bind(ExceptionHandler).toValue(exceptionHandler)]);
+        PromiseWrapper.then(refPromise, null, (reason) {
+          expect(logger.res.join("")).toContain(
+              "The selector \"hello-app\" did not match any elements");
+          async.done();
+          return null;
+        });
+      }));
+    }
     it("should create an injector promise", () {
       var refPromise = bootstrap(HelloRootCmp, testBindings);
       expect(refPromise).not.toBe(null);
@@ -142,14 +168,6 @@ main() {
       var refPromise = bootstrap(HelloRootCmp4, testBindings);
       refPromise.then((ref) {
         expect(ref.hostComponent.lc).toBe(ref.injector.get(LifeCycle));
-        async.done();
-      });
-    }));
-    it("should support shadow dom content tag", inject([AsyncTestCompleter],
-        (async) {
-      var refPromise = bootstrap(HelloRootCmpContent, testBindings);
-      refPromise.then((ref) {
-        expect(el).toHaveText("before: loading after: done");
         async.done();
       });
     }));

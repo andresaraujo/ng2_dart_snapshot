@@ -4,120 +4,78 @@ import 'package:angular2/src/change_detection/pregen_proto_change_detector.dart'
     as _gen;
 
 import 'bar.dart';
+export 'bar.dart';
+import 'package:angular2/src/reflection/reflection.dart' as _ngRef;
 import 'package:angular2/src/core/annotations_impl/annotations.dart';
 import 'package:angular2/src/core/annotations_impl/view.dart';
 
 var _visited = false;
-void initReflector(reflector) {
+void initReflector() {
   if (_visited) return;
   _visited = true;
-  reflector
-    ..registerType(MyComponent, {
-      'factory': () => new MyComponent(),
-      'parameters': const [],
-      'annotations': const [
-        const Component(selector: '[soup]'),
-        const View(template: 'Salad: {{myNum}} is awesome')
-      ]
-    })
+  _ngRef.reflector
+    ..registerType(MyComponent, new _ngRef.ReflectionInfo(const [
+      const Component(selector: '[soup]'),
+      const View(template: 'Salad: {{myNum}} is awesome')
+    ], const [], () => new MyComponent()))
     ..registerGetters({'myNum': (o) => o.myNum})
     ..registerSetters({'myNum': (o, v) => o.myNum = v});
   _gen.preGeneratedProtoDetectors['MyComponent_comp_0'] =
       _MyComponent_ChangeDetector0.newProtoChangeDetector;
 }
-class _MyComponent_ChangeDetector0 extends _gen.AbstractChangeDetector {
-  final dynamic _dispatcher;
-  _gen.Pipes _pipes;
-  final _gen.List<_gen.ProtoRecord> _protos;
-  final _gen.List<_gen.DirectiveRecord> _directiveRecords;
-  dynamic _locals = null;
-  dynamic _alreadyChecked = false;
-  dynamic currentProto = null;
-  MyComponent _context = null;
-  dynamic _myNum0 = _gen.ChangeDetectionUtil.uninitialized();
-  dynamic _interpolate1 = _gen.ChangeDetectionUtil.uninitialized();
+class _MyComponent_ChangeDetector0
+    extends _gen.AbstractChangeDetector<MyComponent> {
+  var myNum0, interpolate1;
 
-  _MyComponent_ChangeDetector0(
-      this._dispatcher, this._protos, this._directiveRecords)
-      : super("MyComponent_comp_0");
-
-  void detectChangesInRecords(throwOnChange) {
-    if (!hydrated()) {
-      _gen.ChangeDetectionUtil.throwDehydrated();
-    }
-    try {
-      this.__detectChangesInRecords(throwOnChange);
-    } catch (e, s) {
-      this.throwError(currentProto, e, s);
-    }
+  _MyComponent_ChangeDetector0(dispatcher, protos, directiveRecords) : super(
+          "MyComponent_comp_0", dispatcher, protos, directiveRecords,
+          'ALWAYS_CHECK') {
+    dehydrateDirectives(false);
   }
 
-  void __detectChangesInRecords(throwOnChange) {
-    var context = null;
-    var myNum0 = null;
-    var interpolate1 = null;
-    var change_context = false;
-    var change_myNum0 = false;
-    var change_interpolate1 = false;
+  void detectChangesInRecordsInternal(throwOnChange) {
+    var l_context = this.context,
+        l_myNum0,
+        c_myNum0,
+        l_interpolate1;
+    c_myNum0 = false;
     var isChanged = false;
-    currentProto = null;
     var changes = null;
 
-    context = _context;
-    currentProto = _protos[0];
-    myNum0 = context.myNum;
-    if (!_gen.looseIdentical(myNum0, _myNum0)) {
-      change_myNum0 = true;
+    this.firstProtoInCurrentBinding = 1;
+    l_myNum0 = l_context.myNum;
+    if (_gen.looseNotIdentical(l_myNum0, this.myNum0)) {
+      c_myNum0 = true;
 
-      _myNum0 = myNum0;
+      this.myNum0 = l_myNum0;
     }
-    if (change_myNum0) {
-      currentProto = _protos[1];
-      interpolate1 = "Salad: " "${myNum0 == null ? "" : myNum0}" " is awesome";
-      if (!_gen.looseIdentical(interpolate1, _interpolate1)) {
-        change_interpolate1 = true;
+    if (c_myNum0) {
+      l_interpolate1 =
+          "Salad: " "${l_myNum0 == null ? "" : l_myNum0}" " is awesome";
+      if (_gen.looseNotIdentical(l_interpolate1, this.interpolate1)) {
         if (throwOnChange) {
-          _gen.ChangeDetectionUtil.throwOnChange(currentProto,
-              _gen.ChangeDetectionUtil.simpleChange(
-                  _interpolate1, interpolate1));
+          this.throwOnChangeError(this.interpolate1, l_interpolate1);
         }
 
-        _dispatcher.notifyOnBinding(currentProto.bindingRecord, interpolate1);
+        this.notifyDispatcher(l_interpolate1);
 
-        _interpolate1 = interpolate1;
+        this.interpolate1 = l_interpolate1;
       }
-    } else {
-      interpolate1 = _interpolate1;
     }
     changes = null;
 
     isChanged = false;
 
-    _alreadyChecked = true;
+    this.alreadyChecked = true;
   }
 
-  void callOnAllChangesDone() {
-    _dispatcher.notifyOnAllChangesDone();
+  void checkNoChanges() {
+    runDetectChanges(true);
   }
 
-  void hydrate(MyComponent context, locals, directives, pipes) {
-    mode = 'ALWAYS_CHECK';
-    _context = context;
-    _locals = locals;
-
-    _alreadyChecked = false;
-    _pipes = pipes;
+  void dehydrateDirectives(destroyPipes) {
+    this.myNum0 = this.interpolate1 = _gen.ChangeDetectionUtil.uninitialized;
   }
-
-  void dehydrate() {
-    _context = null;
-    _myNum0 = _gen.ChangeDetectionUtil.uninitialized();
-    _interpolate1 = _gen.ChangeDetectionUtil.uninitialized();
-    _locals = null;
-    _pipes = null;
-  }
-
-  hydrated() => _context != null;
 
   static _gen.ProtoChangeDetector newProtoChangeDetector(
       _gen.ChangeDetectorDefinition def) {

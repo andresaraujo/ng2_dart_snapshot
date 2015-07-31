@@ -19,8 +19,6 @@ import "package:angular2/core.dart" show QueryList;
 import "package:angular2/annotations.dart"
     show Query, ViewQuery, Component, Directive, View;
 import "package:angular2/angular2.dart" show NgIf, NgFor;
-import "package:angular2/src/facade/collection.dart"
-    show ListWrapper, iterableToList;
 import "package:angular2/src/dom/browser_adapter.dart" show BrowserDomAdapter;
 
 main() {
@@ -226,6 +224,21 @@ main() {
           async.done();
         });
       }));
+      it("should contain all the elements in the light dom even if they get projected",
+          inject([
+        TestComponentBuilder,
+        AsyncTestCompleter
+      ], (TestComponentBuilder tcb, async) {
+        var template = "<needs-query-and-project #q>" +
+            "<div text=\"hello\"></div><div text=\"world\"></div>" +
+            "</needs-query-and-project>";
+        tcb.overrideTemplate(MyComp, template).createAsync(MyComp).then((view) {
+          view.detectChanges();
+          expect(asNativeElements(view.componentViewChildren))
+              .toHaveText("hello|world|");
+          async.done();
+        });
+      }));
     });
     describe("querying in the view", () {
       it("should contain all the elements in the view with that have the given directive",
@@ -284,6 +297,25 @@ main() {
           async.done();
         });
       }));
+      it("should not be affected by other changes in the component", inject([
+        TestComponentBuilder,
+        AsyncTestCompleter
+      ], (TestComponentBuilder tcb, async) {
+        var template =
+            "<needs-view-query-nested-if #q></needs-view-query-nested-if>";
+        tcb.overrideTemplate(MyComp, template).createAsync(MyComp).then((view) {
+          NeedsViewQueryNestedIf q =
+              view.componentViewChildren[0].getLocal("q");
+          view.detectChanges();
+          expect(q.query.length).toEqual(1);
+          expect(q.query.first.text).toEqual("1");
+          q.show = false;
+          view.detectChanges();
+          expect(q.query.length).toEqual(1);
+          expect(q.query.first.text).toEqual("1");
+          async.done();
+        });
+      }));
     });
   });
 }
@@ -293,10 +325,15 @@ class TextDirective {
   String text;
   TextDirective() {}
 }
+@Directive(selector: "[dir]")
+@Injectable()
+class InertDirective {
+  InertDirective() {}
+}
 @Component(selector: "needs-query")
 @View(
-    directives: const [NgFor],
-    template: "<div *ng-for=\"var dir of query\">{{dir.text}}|</div>")
+    directives: const [NgFor, TextDirective],
+    template: "<div text=\"ignoreme\"></div><div *ng-for=\"var dir of query\">{{dir.text}}|</div>")
 @Injectable()
 class NeedsQuery {
   QueryList<TextDirective> query;
@@ -317,7 +354,7 @@ class NeedsQueryDesc {
   }
 }
 @Component(selector: "needs-query-by-var-binding")
-@View(directives: const [], template: "<content>")
+@View(directives: const [], template: "<ng-content>")
 @Injectable()
 class NeedsQueryByLabel {
   QueryList<dynamic> query;
@@ -327,12 +364,23 @@ class NeedsQueryByLabel {
   }
 }
 @Component(selector: "needs-query-by-var-bindings")
-@View(directives: const [], template: "<content>")
+@View(directives: const [], template: "<ng-content>")
 @Injectable()
 class NeedsQueryByTwoLabels {
   QueryList<dynamic> query;
   NeedsQueryByTwoLabels(@Query("textLabel1,textLabel2",
       descendants: true) QueryList<dynamic> query) {
+    this.query = query;
+  }
+}
+@Component(selector: "needs-query-and-project")
+@View(
+    directives: const [NgFor],
+    template: "<div *ng-for=\"var dir of query\">{{dir.text}}|</div><ng-content></ng-content>")
+@Injectable()
+class NeedsQueryAndProject {
+  QueryList<TextDirective> query;
+  NeedsQueryAndProject(@Query(TextDirective) QueryList<TextDirective> query) {
     this.query = query;
   }
 }
@@ -374,12 +422,26 @@ class NeedsViewQueryIf {
     this.show = false;
   }
 }
+@Component(selector: "needs-view-query-nested-if")
+@View(
+    directives: const [NgIf, InertDirective, TextDirective],
+    template: "<div text=\"1\"><div *ng-if=\"show\"><div dir></div></div></div>")
+@Injectable()
+class NeedsViewQueryNestedIf {
+  bool show;
+  QueryList<TextDirective> query;
+  NeedsViewQueryNestedIf(
+      @ViewQuery(TextDirective) QueryList<TextDirective> query) {
+    this.query = query;
+    this.show = true;
+  }
+}
 @Component(selector: "needs-view-query-order")
 @View(
     directives: const [NgFor, TextDirective],
     template: "<div text=\"1\">" +
         "<div *ng-for=\"var i of ['2', '3']\" [text]=\"i\"></div>" +
-        "<div text=\"4\"")
+        "<div text=\"4\">")
 @Injectable()
 class NeedsViewQueryOrder {
   QueryList<TextDirective> query;
@@ -395,11 +457,14 @@ class NeedsViewQueryOrder {
   NeedsQueryDesc,
   NeedsQueryByLabel,
   NeedsQueryByTwoLabels,
+  NeedsQueryAndProject,
   NeedsViewQuery,
   NeedsViewQueryDesc,
   NeedsViewQueryIf,
+  NeedsViewQueryNestedIf,
   NeedsViewQueryOrder,
   TextDirective,
+  InertDirective,
   NgIf,
   NgFor
 ])

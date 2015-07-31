@@ -5,7 +5,7 @@ import "../change_detector_ref.dart" show ChangeDetectorRef;
 
 /**
  * Indicates that the result of a {@link Pipe} transformation has changed even though the reference
- *has not changed.
+ * has not changed.
  *
  * The wrapped value will be unwrapped by change detection, and the unwrapped value will be stored.
  */
@@ -27,9 +27,7 @@ var _wrappedValues = [
 ];
 var _wrappedIndex = 0;
 /**
- * An interface for extending the list of pipes known to Angular.
- *
- * If you are writing a custom {@link Pipe}, you must extend this interface.
+ * An interface which all pipes must implement.
  *
  * #Example
  *
@@ -48,17 +46,20 @@ var _wrappedIndex = 0;
  * ```
  */
 abstract class Pipe {
+  /**
+   * Query if a pipe supports a particular object instance.
+   */
   bool supports(obj);
   void onDestroy();
   dynamic transform(dynamic value, List<dynamic> args);
 }
 /**
- * Provides default implementation of supports and onDestroy.
+ * Provides default implementation of `supports` and `onDestroy` method.
  *
  * #Example
  *
  * ```
- * class DoublePipe extends BasePipe {*
+ * class DoublePipe extends BasePipe {
  *  transform(value) {
  *    return `${value}${value}`;
  *  }
@@ -66,7 +67,7 @@ abstract class Pipe {
  * ```
  */
 class BasePipe implements Pipe {
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return true;
   }
   void onDestroy() {}
@@ -75,6 +76,9 @@ class BasePipe implements Pipe {
   }
   const BasePipe();
 }
+/**
+ *
+ */
 abstract class PipeFactory {
   bool supports(obs);
   Pipe create(ChangeDetectorRef cdRef);

@@ -17,7 +17,7 @@ import "package:angular2/test_lib.dart"
         proxy;
 import "package:angular2/src/facade/lang.dart" show isBlank, stringify;
 import "package:angular2/src/facade/collection.dart" show MapWrapper;
-import "package:angular2/change_detection.dart"
+import "package:angular2/src/change_detection/change_detection.dart"
     show ChangeDetection, ChangeDetectorDefinition;
 import "package:angular2/src/core/compiler/proto_view_factory.dart"
     show
@@ -37,7 +37,7 @@ main() {
   // TODO(tbosch): add missing tests
   describe("ProtoViewFactory", () {
     var changeDetection;
-    var protoViewFactory;
+    ProtoViewFactory protoViewFactory;
     var directiveResolver;
     beforeEach(() {
       directiveResolver = new DirectiveResolver();
@@ -61,11 +61,13 @@ main() {
     });
     describe("createAppProtoViews", () {
       it("should create an AppProtoView for the root render proto view", () {
-        var renderPv = createRenderProtoView();
-        var pvs = protoViewFactory.createAppProtoViews(
+        var varBindings = new Map();
+        varBindings["a"] = "b";
+        var renderPv = createRenderProtoView([], null, varBindings);
+        var appPvs = protoViewFactory.createAppProtoViews(
             bindDirective(MainComponent), renderPv, []);
-        expect(pvs.length).toBe(1);
-        expect(pvs[0].render).toBe(renderPv.render);
+        expect(appPvs[0].variableBindings["a"]).toEqual("b");
+        expect(appPvs.length).toBe(1);
       });
     });
     describe("createDirectiveVariableBindings", () {
@@ -153,15 +155,23 @@ main() {
 directiveBinding({metadata}) {
   return new DirectiveBinding(Key.get("dummy"), null, [], [], [], metadata);
 }
-createRenderProtoView([elementBinders = null, renderApi.ViewType type = null]) {
+createRenderProtoView([elementBinders = null, renderApi.ViewType type = null,
+    variableBindings = null]) {
   if (isBlank(type)) {
     type = renderApi.ViewType.COMPONENT;
   }
   if (isBlank(elementBinders)) {
     elementBinders = [];
   }
+  if (isBlank(variableBindings)) {
+    variableBindings = new Map();
+  }
   return new renderApi.ProtoViewDto(
-      elementBinders: elementBinders, type: type, variableBindings: new Map());
+      elementBinders: elementBinders,
+      type: type,
+      variableBindings: variableBindings,
+      textBindings: [],
+      transitiveNgContentCount: 0);
 }
 createRenderComponentElementBinder(directiveIndex) {
   return new renderApi.ElementBinder(
@@ -172,7 +182,7 @@ createRenderComponentElementBinder(directiveIndex) {
 createRenderViewportElementBinder(nestedProtoView) {
   return new renderApi.ElementBinder(nestedProtoView: nestedProtoView);
 }
-@proxy
+@proxy()
 class ChangeDetectionSpy extends SpyObject implements ChangeDetection {
   ChangeDetectionSpy() : super(ChangeDetection) {
     /* super call moved to initializer */;

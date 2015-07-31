@@ -5,7 +5,8 @@ import "package:angular2/src/facade/lang.dart"
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
 import "package:angular2/src/facade/collection.dart"
     show MapWrapper, ListWrapper;
-import "package:angular2/change_detection.dart" show Parser;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show Parser;
 import "compile_step.dart" show CompileStep;
 import "compile_element.dart" show CompileElement;
 import "compile_control.dart" show CompileControl;
@@ -30,7 +31,10 @@ import "../util.dart" show dashCaseToCamelCase;
 class ViewSplitter implements CompileStep {
   Parser _parser;
   ViewSplitter(this._parser) {}
-  process(
+  String processStyle(String style) {
+    return style;
+  }
+  processElement(
       CompileElement parent, CompileElement current, CompileControl control) {
     var attrs = current.attrs();
     var templateBindings = attrs["template"];
@@ -71,23 +75,30 @@ class ViewSplitter implements CompileStep {
         }
       }
       if (hasTemplateBinding) {
-        var newParent = new CompileElement(DOM.createTemplate(""));
-        newParent.inheritedProtoView = current.inheritedProtoView;
-        newParent.inheritedElementBinder = current.inheritedElementBinder;
-        newParent.distanceToInheritedBinder = current.distanceToInheritedBinder;
+        var anchor = new CompileElement(DOM.createTemplate(""));
+        anchor.inheritedProtoView = current.inheritedProtoView;
+        anchor.inheritedElementBinder = current.inheritedElementBinder;
+        anchor.distanceToInheritedBinder = current.distanceToInheritedBinder;
         // newParent doesn't appear in the original template, so we associate
 
         // the current element description to get a more meaningful message in case of error
-        newParent.elementDescription = current.elementDescription;
-        current.inheritedProtoView =
-            newParent.bindElement().bindNestedProtoView(current.element);
+        anchor.elementDescription = current.elementDescription;
+        var viewRoot = new CompileElement(DOM.createTemplate(""));
+        viewRoot.inheritedProtoView =
+            anchor.bindElement().bindNestedProtoView(viewRoot.element);
+        // viewRoot doesn't appear in the original template, so we associate
+
+        // the current element description to get a more meaningful message in case of error
+        viewRoot.elementDescription = current.elementDescription;
+        viewRoot.isViewRoot = true;
+        current.inheritedProtoView = viewRoot.inheritedProtoView;
         current.inheritedElementBinder = null;
         current.distanceToInheritedBinder = 0;
-        current.isViewRoot = true;
-        this._parseTemplateBindings(templateBindings, newParent);
-        this._addParentElement(current.element, newParent.element);
-        control.addParent(newParent);
-        DOM.remove(current.element);
+        this._parseTemplateBindings(templateBindings, anchor);
+        DOM.insertBefore(current.element, anchor.element);
+        control.addParent(anchor);
+        DOM.appendChild(DOM.content(viewRoot.element), current.element);
+        control.addParent(viewRoot);
       }
     }
   }
@@ -97,10 +108,6 @@ class ViewSplitter implements CompileStep {
       DOM.appendChild(target, next);
       next = DOM.firstChild(source);
     }
-  }
-  _addParentElement(currentElement, newParentElement) {
-    DOM.insertBefore(currentElement, newParentElement);
-    DOM.appendChild(newParentElement, currentElement);
   }
   _parseTemplateBindings(
       String templateBindings, CompileElement compileElement) {

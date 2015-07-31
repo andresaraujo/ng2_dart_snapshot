@@ -105,7 +105,7 @@ main() {
     });
   });
 }
-@proxy
+@proxy()
 class SpyChangeDetectorRef extends SpyObject implements ChangeDetectorRef {
   SpyChangeDetectorRef() : super(ChangeDetectorRef) {
     /* super call moved to initializer */;

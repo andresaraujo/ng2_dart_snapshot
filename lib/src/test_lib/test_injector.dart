@@ -5,7 +5,7 @@ import "package:angular2/src/core/compiler/compiler.dart"
     show Compiler, CompilerCache;
 import "package:angular2/src/reflection/reflection.dart"
     show Reflector, reflector;
-import "package:angular2/change_detection.dart"
+import "package:angular2/src/change_detection/change_detection.dart"
     show
         Parser,
         Lexer,
@@ -22,15 +22,13 @@ import "package:angular2/src/core/compiler/directive_resolver.dart"
     show DirectiveResolver;
 import "package:angular2/src/core/compiler/dynamic_component_loader.dart"
     show DynamicComponentLoader;
-import "package:angular2/src/render/dom/shadow_dom/shadow_dom_strategy.dart"
-    show ShadowDomStrategy;
-import "package:angular2/src/render/dom/shadow_dom/emulated_unscoped_shadow_dom_strategy.dart"
-    show EmulatedUnscopedShadowDomStrategy;
 import "package:angular2/src/render/xhr.dart" show XHR;
 import "package:angular2/src/core/compiler/component_url_mapper.dart"
     show ComponentUrlMapper;
 import "package:angular2/src/services/url_resolver.dart" show UrlResolver;
 import "package:angular2/src/services/app_root_url.dart" show AppRootUrl;
+import "package:angular2/src/services/anchor_based_app_root_url.dart"
+    show AnchorBasedAppRootUrl;
 import "package:angular2/src/render/dom/compiler/style_url_resolver.dart"
     show StyleUrlResolver;
 import "package:angular2/src/render/dom/compiler/style_inliner.dart"
@@ -61,10 +59,24 @@ import "package:angular2/debug.dart" show ELEMENT_PROBE_CONFIG;
 import "package:angular2/src/core/compiler/proto_view_factory.dart"
     show ProtoViewFactory;
 import "package:angular2/src/render/api.dart" show RenderCompiler, Renderer;
-import "package:angular2/src/render/dom/dom_renderer.dart"
-    show DomRenderer, DOCUMENT_TOKEN;
-import "package:angular2/src/render/dom/compiler/compiler.dart"
-    show DefaultDomCompiler;
+import "package:angular2/src/render/render.dart"
+    show
+        DomRenderer,
+        DOCUMENT_TOKEN,
+        DOM_REFLECT_PROPERTIES_AS_ATTRIBUTES,
+        DefaultDomCompiler,
+        APP_ID_TOKEN,
+        SharedStylesHost,
+        DomSharedStylesHost,
+        MAX_IN_MEMORY_ELEMENTS_PER_TEMPLATE_TOKEN,
+        TemplateCloner;
+import "package:angular2/src/render/dom/schema/element_schema_registry.dart"
+    show ElementSchemaRegistry;
+import "package:angular2/src/render/dom/schema/dom_element_schema_registry.dart"
+    show DomElementSchemaRegistry;
+import "package:angular2/src/web-workers/shared/serializer.dart"
+    show Serializer;
+import "utils.dart" show Log;
 
 /**
  * Returns the root injector bindings.
@@ -87,40 +99,48 @@ _getAppBindings() {
   var appDoc;
   // The document is only available in browser environment
   try {
-    appDoc = DOM.defaultDoc();
+    appDoc = DOM.createHtmlDocument();
   } catch (e, e_stack) {
     appDoc = null;
   }
   return [
     bind(DOCUMENT_TOKEN).toValue(appDoc),
-    bind(ShadowDomStrategy).toFactory((doc) =>
-        new EmulatedUnscopedShadowDomStrategy(doc.head), [DOCUMENT_TOKEN]),
     DomRenderer,
-    DefaultDomCompiler,
     bind(Renderer).toAlias(DomRenderer),
+    bind(APP_ID_TOKEN).toValue("a"),
+    TemplateCloner,
+    bind(MAX_IN_MEMORY_ELEMENTS_PER_TEMPLATE_TOKEN).toValue(-1),
+    DefaultDomCompiler,
     bind(RenderCompiler).toAlias(DefaultDomCompiler),
+    bind(ElementSchemaRegistry).toValue(new DomElementSchemaRegistry()),
+    DomSharedStylesHost,
+    bind(SharedStylesHost).toAlias(DomSharedStylesHost),
+    bind(DOM_REFLECT_PROPERTIES_AS_ATTRIBUTES).toValue(false),
     ProtoViewFactory,
     AppViewPool,
     AppViewManager,
     AppViewManagerUtils,
+    Serializer,
     ELEMENT_PROBE_CONFIG,
     bind(APP_VIEW_POOL_CAPACITY).toValue(500),
     Compiler,
     CompilerCache,
     bind(ViewResolver).toClass(MockViewResolver),
     bind(Pipes).toValue(defaultPipes),
+    Log,
     bind(ChangeDetection).toClass(DynamicChangeDetection),
     ViewLoader,
     DynamicComponentLoader,
     DirectiveResolver,
     Parser,
     Lexer,
-    ExceptionHandler,
+    bind(ExceptionHandler).toValue(new ExceptionHandler(DOM)),
     bind(LocationStrategy).toClass(MockLocationStrategy),
     bind(XHR).toClass(MockXHR),
     ComponentUrlMapper,
     UrlResolver,
-    AppRootUrl,
+    AnchorBasedAppRootUrl,
+    bind(AppRootUrl).toAlias(AnchorBasedAppRootUrl),
     StyleUrlResolver,
     StyleInliner,
     TestComponentBuilder,
@@ -176,8 +196,11 @@ class FunctionWithParamTokens {
     this._tokens = tokens;
     this._fn = fn;
   }
-  void execute(Injector injector) {
+  /**
+   * Returns the value of the executed function.
+   */
+  dynamic execute(Injector injector) {
     var params = ListWrapper.map(this._tokens, (t) => injector.get(t));
-    FunctionWrapper.apply(this._fn, params);
+    return FunctionWrapper.apply(this._fn, params);
   }
 }

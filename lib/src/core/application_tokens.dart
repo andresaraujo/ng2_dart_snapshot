@@ -22,4 +22,4 @@ const appComponentRefPromiseToken = const OpaqueToken("Promise<ComponentRef>");
  *
  * ```
  */
-const appComponentTypeToken = const OpaqueToken("RootComponent");
+const OpaqueToken appComponentTypeToken = const OpaqueToken("RootComponent");

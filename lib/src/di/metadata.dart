@@ -46,21 +46,21 @@ class OptionalMetadata {
  * For example:
  *
  * ```
- * class Parent extends DependencyMetadata {}
+ * class Exclude extends DependencyMetadata {}
  * class NotDependencyProperty {}
  *
  * class AComponent {
- *   constructor(@Parent @NotDependencyProperty aService:AService) {}
+ *   constructor(@Exclude @NotDependencyProperty aService:AService) {}
  * }
  * ```
  *
  * will create the following dependency:
  *
  * ```
- * new Dependency(Key.get(AService), [new Parent()])
+ * new Dependency(Key.get(AService), [new Exclude()])
  * ```
  *
- * The framework can use `new Parent()` to handle the `aService` dependency
+ * The framework can use `new Exclude()` to handle the `aService` dependency
  * in a specific way.
  */
 class DependencyMetadata {
@@ -86,23 +86,6 @@ class InjectableMetadata {
   const InjectableMetadata();
 }
 /**
- * Specifies how injector should resolve a dependency.
- *
- * See {@link Self}, {@link Parent}, {@link Ancestor}, {@link Unbounded}.
- */
-class VisibilityMetadata {
-  final num depth;
-  final bool crossBoundaries;
-  final bool _includeSelf;
-  const VisibilityMetadata(this.depth, this.crossBoundaries, this._includeSelf);
-  bool get includeSelf {
-    return isBlank(this._includeSelf) ? false : this._includeSelf;
-  }
-  String toString() {
-    return '''@Visibility(depth: ${ this . depth}, crossBoundaries: ${ this . crossBoundaries}, includeSelf: ${ this . includeSelf}})''';
-  }
-}
-/**
  * Specifies that an injector should retrieve a dependency from itself.
  *
  * ## Example
@@ -120,50 +103,48 @@ class VisibilityMetadata {
  * expect(nd.dependency).toBeAnInstanceOf(Dependency);
  * ```
  */
-class SelfMetadata extends VisibilityMetadata {
-  const SelfMetadata() : super(0, false, true);
+class SelfMetadata {
   String toString() {
     return '''@Self()''';
   }
+  const SelfMetadata();
 }
 /**
- * Specifies that an injector should retrieve a dependency from the direct parent.
+ * Specifies that the dependency resolution should start from the parent injector.
  *
  * ## Example
  *
+ *
  * ```
- * class Dependency {
+ * class Service {}
+ *
+ * class ParentService implements Service {
  * }
  *
- * class NeedsDependency {
- *   constructor(public @Parent() dependency:Dependency) {}
+ * class ChildService implements Service {
+ *   constructor(public @SkipSelf() parentService:Service) {}
  * }
  *
  * var parent = Injector.resolveAndCreate([
- *   bind(Dependency).toClass(ParentDependency)
+ *   bind(Service).toClass(ParentService)
  * ]);
- * var child = parent.resolveAndCreateChild([NeedsDependency, Depedency]);
- * var nd = child.get(NeedsDependency);
- * expect(nd.dependency).toBeAnInstanceOf(ParentDependency);
- * ```
- *
- * You can make an injector to retrive a dependency either from itself or its direct parent by
- * setting self to true.
- *
- * ```
- * class NeedsDependency {
- *   constructor(public @Parent({self:true}) dependency:Dependency) {}
- * }
+ * var child = parent.resolveAndCreateChild([
+ *   bind(Service).toClass(ChildSerice)
+ * ]);
+ * var s = child.get(Service);
+ * expect(s).toBeAnInstanceOf(ChildService);
+ * expect(s.parentService).toBeAnInstanceOf(ParentService);
  * ```
  */
-class ParentMetadata extends VisibilityMetadata {
-  const ParentMetadata({self}) : super(1, false, self);
+class SkipSelfMetadata {
   String toString() {
-    return '''@Parent(self: ${ this . includeSelf}})''';
+    return '''@SkipSelf()''';
   }
+  const SkipSelfMetadata();
 }
 /**
- * Specifies that an injector should retrieve a dependency from any ancestor from the same boundary.
+ * Specifies that an injector should retrieve a dependency from any injector until reaching the
+ * closest host.
  *
  * ## Example
  *
@@ -172,68 +153,22 @@ class ParentMetadata extends VisibilityMetadata {
  * }
  *
  * class NeedsDependency {
- *   constructor(public @Ancestor() dependency:Dependency) {}
+ *   constructor(public @Host() dependency:Dependency) {}
  * }
  *
  * var parent = Injector.resolveAndCreate([
- *   bind(Dependency).toClass(AncestorDependency)
- * ]);
- * var child = parent.resolveAndCreateChild([]);
- * var grandChild = child.resolveAndCreateChild([NeedsDependency, Depedency]);
- * var nd = grandChild.get(NeedsDependency);
- * expect(nd.dependency).toBeAnInstanceOf(AncestorDependency);
- * ```
- *
- * You can make an injector to retrive a dependency either from itself or its ancestor by setting
- * self to true.
- *
- * ```
- * class NeedsDependency {
- *   constructor(public @Ancestor({self:true}) dependency:Dependency) {}
- * }
- * ```
- */
-class AncestorMetadata extends VisibilityMetadata {
-  const AncestorMetadata({self}) : super(999999, false, self);
-  String toString() {
-    return '''@Ancestor(self: ${ this . includeSelf}})''';
-  }
-}
-/**
- * Specifies that an injector should retrieve a dependency from any ancestor, crossing boundaries.
- *
- * ## Example
- *
- * ```
- * class Dependency {
- * }
- *
- * class NeedsDependency {
- *   constructor(public @Ancestor() dependency:Dependency) {}
- * }
- *
- * var parent = Injector.resolveAndCreate([
- *   bind(Dependency).toClass(AncestorDependency)
+ *   bind(Dependency).toClass(HostDependency)
  * ]);
  * var child = parent.resolveAndCreateChild([]);
  * var grandChild = child.resolveAndCreateChild([NeedsDependency, Depedency]);
  * var nd = grandChild.get(NeedsDependency);
- * expect(nd.dependency).toBeAnInstanceOf(AncestorDependency);
+ * expect(nd.dependency).toBeAnInstanceOf(HostDependency);
  * ```
- *
- * You can make an injector to retrive a dependency either from itself or its ancestor by setting
- * self to true.
- *
- * ```
- * class NeedsDependency {
- *   constructor(public @Ancestor({self:true}) dependency:Dependency) {}
- * }
  * ```
  */
-class UnboundedMetadata extends VisibilityMetadata {
-  const UnboundedMetadata({self}) : super(999999, true, self);
+class HostMetadata {
   String toString() {
-    return '''@Unbounded(self: ${ this . includeSelf}})''';
+    return '''@Host()''';
   }
+  const HostMetadata();
 }
-const DEFAULT_VISIBILITY = const UnboundedMetadata(self: true);

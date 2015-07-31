@@ -2,15 +2,15 @@ library angular2.src.forms.directives.ng_control_name;
 
 import "package:angular2/src/facade/async.dart"
     show EventEmitter, ObservableWrapper;
-import "package:angular2/src/facade/collection.dart"
-    show List, StringMapWrapper, Map;
-import "package:angular2/angular2.dart"
-    show Directive, LifecycleEvent, Query, QueryList;
-import "package:angular2/di.dart" show Ancestor, Binding, Inject;
+import "package:angular2/src/facade/collection.dart" show List, Map;
+import "package:angular2/core.dart" show QueryList;
+import "package:angular2/annotations.dart"
+    show Query, Directive, LifecycleEvent;
+import "package:angular2/di.dart" show Host, SkipSelf, Binding, Inject;
 import "control_container.dart" show ControlContainer;
 import "ng_control.dart" show NgControl;
 import "validators.dart" show NgValidator;
-import "shared.dart" show controlPath, composeNgValidator;
+import "shared.dart" show controlPath, composeNgValidator, isPropertyUpdated;
 import "../model.dart" show Control;
 
 const controlNameBinding = const Binding(NgControl, toAlias: NgControlName);
@@ -72,7 +72,7 @@ const controlNameBinding = const Binding(NgControl, toAlias: NgControlName);
  */
 @Directive(
     selector: "[ng-control]",
-    hostInjector: const [controlNameBinding],
+    bindings: const [controlNameBinding],
     properties: const ["name: ngControl", "model: ngModel"],
     events: const ["update: ngModel"],
     lifecycle: const [LifecycleEvent.onDestroy, LifecycleEvent.onChange],
@@ -81,10 +81,11 @@ class NgControlName extends NgControl {
   ControlContainer _parent;
   var update = new EventEmitter();
   dynamic model;
+  dynamic viewModel;
   QueryList<NgValidator> ngValidators;
   var _added = false;
   // Scope the query once https://github.com/angular/angular/issues/2603 is fixed
-  NgControlName(@Ancestor() ControlContainer parent,
+  NgControlName(@Host() @SkipSelf() ControlContainer parent,
       @Query(NgValidator) QueryList<NgValidator> ngValidators)
       : super() {
     /* super call moved to initializer */;
@@ -96,7 +97,8 @@ class NgControlName extends NgControl {
       this.formDirective.addControl(this);
       this._added = true;
     }
-    if (StringMapWrapper.contains(c, "model")) {
+    if (isPropertyUpdated(c, this.viewModel)) {
+      this.viewModel = this.model;
       this.formDirective.updateModel(this, this.model);
     }
   }
@@ -104,6 +106,7 @@ class NgControlName extends NgControl {
     this.formDirective.removeControl(this);
   }
   void viewToModelUpdate(dynamic newValue) {
+    this.viewModel = newValue;
     ObservableWrapper.callNext(this.update, newValue);
   }
   List<String> get path {

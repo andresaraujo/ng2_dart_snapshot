@@ -1,33 +1,25 @@
 library angular2.src.render.dom.view.element_binder;
 
-import "package:angular2/change_detection.dart" show AST;
+import "package:angular2/src/change_detection/change_detection.dart" show AST;
 import "package:angular2/src/facade/collection.dart" show List, ListWrapper;
-import "proto_view.dart" as protoViewModule;
+import "package:angular2/src/facade/lang.dart" show isPresent;
 
-class ElementBinder {
-  String contentTagSelector;
+class DomElementBinder {
   List<num> textNodeIndices;
-  protoViewModule.DomProtoView nestedProtoView;
+  bool hasNestedProtoView;
   AST eventLocals;
   List<Event> localEvents;
   List<Event> globalEvents;
-  String componentId;
-  num parentIndex;
-  num distanceToParent;
-  bool elementIsEmpty;
-  ElementBinder({textNodeIndices, contentTagSelector, nestedProtoView,
-      componentId, eventLocals, localEvents, globalEvents, parentIndex,
-      distanceToParent, elementIsEmpty}) {
+  bool hasNativeShadowRoot;
+  DomElementBinder({textNodeIndices, hasNestedProtoView, eventLocals,
+      localEvents, globalEvents, hasNativeShadowRoot}) {
     this.textNodeIndices = textNodeIndices;
-    this.contentTagSelector = contentTagSelector;
-    this.nestedProtoView = nestedProtoView;
-    this.componentId = componentId;
+    this.hasNestedProtoView = hasNestedProtoView;
     this.eventLocals = eventLocals;
     this.localEvents = localEvents;
     this.globalEvents = globalEvents;
-    this.parentIndex = parentIndex;
-    this.distanceToParent = distanceToParent;
-    this.elementIsEmpty = elementIsEmpty;
+    this.hasNativeShadowRoot =
+        isPresent(hasNativeShadowRoot) ? hasNativeShadowRoot : false;
   }
 }
 class Event {

@@ -1,5 +1,6 @@
 library angular2.src.forms.form_builder;
 
+import "package:angular2/di.dart" show Injectable;
 import "package:angular2/src/facade/collection.dart"
     show StringMapWrapper, ListWrapper, List;
 import "package:angular2/src/facade/lang.dart" show isPresent, isArray;
@@ -16,7 +17,7 @@ import "model.dart" as modelModule;
  *
  * @Component({
  *   selector: 'login-comp',
- *   viewInjector: [
+ *   viewBindings: [
  *     FormBuilder
  *   ]
  * })
@@ -69,6 +70,7 @@ import "model.dart" as modelModule;
  *
  *  ```
  */
+@Injectable()
 class FormBuilder {
   modelModule.ControlGroup group(Map<String, dynamic> controlsConfig,
       [Map<String, dynamic> extra = null]) {

@@ -1,6 +1,8 @@
 library angular2.src.core.annotations_impl.view;
 
 import "package:angular2/src/facade/lang.dart" show Type;
+import "package:angular2/src/render/api.dart" show ViewEncapsulation;
+export "package:angular2/src/render/api.dart" show ViewEncapsulation;
 
 /**
  * Declares the available HTML templates for an application.
@@ -84,16 +86,17 @@ class View {
   // for an unused import.
   final List<dynamic /* Type | dynamic | List < dynamic > */ > directives;
   /**
-   * Specify a custom renderer for this View.
-   * If this is set, neither `template`, `templateUrl`, `styles`, `styleUrls` nor `directives` are
-   * used.
+   * Specify how the template and the styles should be encapsulated.
+   * The default is {@link ViewEncapsulation#EMULATED} if the view has styles,
+   * otherwise {@link ViewEncapsulation#NONE}.
    */
-  final String renderer;
-  const View({templateUrl, template, directives, renderer, styles, styleUrls})
+  final ViewEncapsulation encapsulation;
+  const View(
+      {templateUrl, template, directives, encapsulation, styles, styleUrls})
       : templateUrl = templateUrl,
         template = template,
         styleUrls = styleUrls,
         styles = styles,
         directives = directives,
-        renderer = renderer;
+        encapsulation = encapsulation;
 }

@@ -5,8 +5,6 @@ import "package:angular2/src/facade/collection.dart"
 import "package:angular2/src/dom/dom_adapter.dart" show DOM;
 import "package:angular2/src/facade/lang.dart"
     show isPresent, isString, RegExpWrapper, StringWrapper, RegExp;
-import "package:angular2/src/render/dom/view/view.dart"
-    show resolveInternalDomView;
 
 class Log {
   List<dynamic> _result;
@@ -25,24 +23,11 @@ class Log {
     return ListWrapper.join(this._result, "; ");
   }
 }
-List<dynamic> viewRootNodes(view) {
-  return resolveInternalDomView(view.render).rootNodes;
-}
-dynamic queryView(view, String selector) {
-  var rootNodes = viewRootNodes(view);
-  for (var i = 0; i < rootNodes.length; ++i) {
-    var res = DOM.querySelector(rootNodes[i], selector);
-    if (isPresent(res)) {
-      return res;
-    }
-  }
-  return null;
-}
 dispatchEvent(element, eventType) {
   DOM.dispatchEvent(element, DOM.createEvent(eventType));
 }
-el(String html) {
-  return DOM.firstChild(DOM.content(DOM.createTemplate(html)));
+dynamic el(String html) {
+  return (DOM.firstChild(DOM.content(DOM.createTemplate(html))) as dynamic);
 }
 var _RE_SPECIAL_CHARS = [
   "-",
@@ -111,6 +96,8 @@ String stringifyElement(el) {
     if (!ListWrapper.contains(_singleTagWhitelist, tagName)) {
       result += '''</${ tagName}>''';
     }
+  } else if (DOM.isCommentNode(el)) {
+    result += '''<!--${ DOM . nodeValue ( el )}-->''';
   } else {
     result += DOM.getText(el);
   }

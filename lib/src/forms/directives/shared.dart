@@ -1,8 +1,9 @@
 library angular2.src.forms.directives.shared;
 
 import "package:angular2/src/facade/collection.dart"
-    show ListWrapper, iterableToList;
-import "package:angular2/src/facade/lang.dart" show isBlank, BaseException;
+    show ListWrapper, StringMapWrapper;
+import "package:angular2/src/facade/lang.dart"
+    show isBlank, BaseException, looseIdentical;
 import "control_container.dart" show ControlContainer;
 import "ng_control.dart" show NgControl;
 import "validators.dart" show NgValidator;
@@ -24,7 +25,7 @@ setUpControl(Control c, NgControl dir) {
   // view -> model
   dir.valueAccessor.registerOnChange((newValue) {
     dir.viewToModelUpdate(newValue);
-    c.updateValue(newValue);
+    c.updateValue(newValue, emitModelToViewChange: false);
     c.markAsDirty();
   });
   // model -> view
@@ -34,10 +35,7 @@ setUpControl(Control c, NgControl dir) {
 }
 Function composeNgValidator(QueryList<NgValidator> ngValidators) {
   if (isBlank(ngValidators)) return Validators.nullValidator;
-  return Validators.compose(
-      ((iterableToList(ngValidators) as List<NgValidator>))
-          .map((v) => v.validator)
-          .toList());
+  return Validators.compose(ngValidators.map((v) => v.validator));
 }
 void _throwError(NgControl dir, String message) {
   var path = ListWrapper.join(dir.path, " -> ");
@@ -46,4 +44,10 @@ void _throwError(NgControl dir, String message) {
 setProperty(Renderer renderer, ElementRef elementRef, String propName,
     dynamic propValue) {
   renderer.setElementProperty(elementRef, propName, propValue);
+}
+bool isPropertyUpdated(Map<String, dynamic> changes, dynamic viewModel) {
+  if (!StringMapWrapper.contains(changes, "model")) return false;
+  var change = changes["model"];
+  if (change.isFirstChange()) return true;
+  return !looseIdentical(viewModel, change.currentValue);
 }

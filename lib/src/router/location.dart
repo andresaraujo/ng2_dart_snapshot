@@ -4,6 +4,7 @@ import "location_strategy.dart" show LocationStrategy;
 import "package:angular2/src/facade/lang.dart" show StringWrapper, isPresent;
 import "package:angular2/src/facade/async.dart"
     show EventEmitter, ObservableWrapper;
+import "package:angular2/src/facade/lang.dart" show BaseException, isBlank;
 import "package:angular2/di.dart"
     show OpaqueToken, Injectable, Optional, Inject;
 
@@ -25,8 +26,13 @@ class Location {
   String _baseHref;
   Location(this._platformStrategy,
       [@Optional() @Inject(appBaseHrefToken) String href]) {
-    this._baseHref = stripTrailingSlash(stripIndexHtml(
-        isPresent(href) ? href : this._platformStrategy.getBaseHref()));
+    var browserBaseHref =
+        isPresent(href) ? href : this._platformStrategy.getBaseHref();
+    if (isBlank(browserBaseHref)) {
+      throw new BaseException(
+          '''No base href set. Either provide a binding to "appBaseHrefToken" or add a base element.''');
+    }
+    this._baseHref = stripTrailingSlash(stripIndexHtml(browserBaseHref));
     this._platformStrategy.onPopState((_) => this._onPopState(_));
   }
   void _onPopState(_) {
@@ -66,7 +72,9 @@ class Location {
   void back() {
     this._platformStrategy.back();
   }
-  void subscribe(onNext, [onThrow = null, onReturn = null]) {
+  void subscribe(dynamic /* (value: any) => void */ onNext,
+      [dynamic /* (exception: any) => void */ onThrow = null,
+      dynamic /* () => void */ onReturn = null]) {
     ObservableWrapper.subscribe(this._subject, onNext, onThrow, onReturn);
   }
 }

@@ -1,6 +1,6 @@
 library angular2.src.core.compiler.element_binder;
 
-import "package:angular2/change_detection.dart" show AST;
+import "package:angular2/src/change_detection/change_detection.dart" show AST;
 import "package:angular2/src/facade/lang.dart"
     show isBlank, isPresent, BaseException;
 import "element_injector.dart" as eiModule;

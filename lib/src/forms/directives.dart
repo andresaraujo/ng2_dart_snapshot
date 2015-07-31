@@ -25,7 +25,7 @@ export "directives/default_value_accessor.dart" show DefaultValueAccessor;
 export "directives/checkbox_value_accessor.dart"
     show CheckboxControlValueAccessor;
 export "directives/select_control_value_accessor.dart"
-    show SelectControlValueAccessor;
+    show SelectControlValueAccessor, NgSelectOption;
 export "directives/validators.dart" show NgValidator, NgRequiredValidator;
 
 /**

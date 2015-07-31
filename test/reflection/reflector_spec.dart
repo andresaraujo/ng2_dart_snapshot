@@ -2,7 +2,8 @@ library angular2.test.reflection.reflector_spec;
 
 import "package:angular2/test_lib.dart"
     show describe, it, iit, ddescribe, expect, beforeEach, IS_DARTIUM;
-import "package:angular2/src/reflection/reflection.dart" show Reflector;
+import "package:angular2/src/reflection/reflection.dart"
+    show Reflector, ReflectionInfo;
 import "package:angular2/src/reflection/reflection_capabilities.dart"
     show ReflectionCapabilities;
 import "reflector_common.dart"
@@ -287,7 +288,8 @@ main() {
         expect(() => reflector.factory(TestObjWith21Args)).toThrowError();
       });
       it("should return a registered factory if available", () {
-        reflector.registerType(TestObj, {"factory": () => "fake"});
+        reflector.registerType(
+            TestObj, new ReflectionInfo(null, null, () => "fake"));
         expect(reflector.factory(TestObj)()).toEqual("fake");
       });
     });
@@ -302,12 +304,12 @@ main() {
         expect(p.length).toEqual(2);
       });
       it("should return registered parameters if available", () {
-        reflector.registerType(TestObj, {"parameters": [1, 2]});
-        expect(reflector.parameters(TestObj)).toEqual([1, 2]);
+        reflector.registerType(TestObj, new ReflectionInfo(null, [[1], [2]]));
+        expect(reflector.parameters(TestObj)).toEqual([[1], [2]]);
       });
       it("should return an empty list when no paramters field in the stored type info",
           () {
-        reflector.registerType(TestObj, {});
+        reflector.registerType(TestObj, new ReflectionInfo());
         expect(reflector.parameters(TestObj)).toEqual([]);
       });
     });
@@ -317,7 +319,7 @@ main() {
         expect(p).toEqual([classDecorator("class")]);
       });
       it("should return registered annotations if available", () {
-        reflector.registerType(TestObj, {"annotations": [1, 2]});
+        reflector.registerType(TestObj, new ReflectionInfo([1, 2]));
         expect(reflector.annotations(TestObj)).toEqual([1, 2]);
       });
       it("should work for a class without annotations", () {

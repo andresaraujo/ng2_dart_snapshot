@@ -1,9 +1,9 @@
 library angular2.src.core.life_cycle.life_cycle;
 
 import "package:angular2/di.dart" show Injectable;
-import "package:angular2/change_detection.dart" show ChangeDetector;
+import "package:angular2/src/change_detection/change_detection.dart"
+    show ChangeDetector;
 import "package:angular2/src/core/zone/ng_zone.dart" show NgZone;
-import "package:angular2/src/core/exception_handler.dart" show ExceptionHandler;
 import "package:angular2/src/facade/lang.dart" show isPresent, BaseException;
 
 /**
@@ -34,17 +34,11 @@ import "package:angular2/src/facade/lang.dart" show isPresent, BaseException;
  */
 @Injectable()
 class LifeCycle {
-  var _errorHandler;
   ChangeDetector _changeDetector;
   bool _enforceNoNewChanges;
   bool _runningTick = false;
-  LifeCycle(ExceptionHandler exceptionHandler,
-      [ChangeDetector changeDetector = null,
+  LifeCycle([ChangeDetector changeDetector = null,
       bool enforceNoNewChanges = false]) {
-    this._errorHandler = (exception, stackTrace) {
-      exceptionHandler.call(exception, stackTrace);
-      throw exception;
-    };
     this._changeDetector = changeDetector;
     this._enforceNoNewChanges = enforceNoNewChanges;
   }
@@ -55,7 +49,6 @@ class LifeCycle {
     if (isPresent(changeDetector)) {
       this._changeDetector = changeDetector;
     }
-    zone.overrideOnErrorHandler(this._errorHandler);
     zone.overrideOnTurnDone(() => this.tick());
   }
   /**

@@ -1,8 +1,8 @@
 library angular2.src.directives.ng_switch;
 
 import "package:angular2/annotations.dart" show Directive;
-import "package:angular2/di.dart" show Parent;
-import "package:angular2/core.dart" show ViewContainerRef, ProtoViewRef;
+import "package:angular2/di.dart" show Host;
+import "package:angular2/core.dart" show ViewContainerRef, TemplateRef;
 import "package:angular2/src/facade/lang.dart"
     show isPresent, isBlank, normalizeBlank;
 import "package:angular2/src/facade/collection.dart"
@@ -10,13 +10,13 @@ import "package:angular2/src/facade/collection.dart"
 
 class SwitchView {
   ViewContainerRef _viewContainerRef;
-  ProtoViewRef _protoViewRef;
-  SwitchView(ViewContainerRef viewContainerRef, ProtoViewRef protoViewRef) {
-    this._protoViewRef = protoViewRef;
+  TemplateRef _templateRef;
+  SwitchView(ViewContainerRef viewContainerRef, TemplateRef templateRef) {
+    this._templateRef = templateRef;
     this._viewContainerRef = viewContainerRef;
   }
   create() {
-    this._viewContainerRef.create(this._protoViewRef);
+    this._viewContainerRef.createEmbeddedView(this._templateRef);
   }
   destroy() {
     this._viewContainerRef.clear();
@@ -146,12 +146,12 @@ class NgSwitchWhen {
   dynamic _value;
   NgSwitch _switch;
   SwitchView _view;
-  NgSwitchWhen(ViewContainerRef viewContainer, ProtoViewRef protoViewRef,
-      @Parent() NgSwitch sswitch) {
+  NgSwitchWhen(ViewContainerRef viewContainer, TemplateRef templateRef,
+      @Host() NgSwitch sswitch) {
     // `_whenDefault` is used as a marker for a not yet initialized value
     this._value = _whenDefault;
     this._switch = sswitch;
-    this._view = new SwitchView(viewContainer, protoViewRef);
+    this._view = new SwitchView(viewContainer, templateRef);
   }
   onDestroy() {
     this._switch;
@@ -174,10 +174,10 @@ class NgSwitchWhen {
  */
 @Directive(selector: "[ng-switch-default]")
 class NgSwitchDefault {
-  NgSwitchDefault(ViewContainerRef viewContainer, ProtoViewRef protoViewRef,
-      @Parent() NgSwitch sswitch) {
+  NgSwitchDefault(ViewContainerRef viewContainer, TemplateRef templateRef,
+      @Host() NgSwitch sswitch) {
     sswitch._registerView(
-        _whenDefault, new SwitchView(viewContainer, protoViewRef));
+        _whenDefault, new SwitchView(viewContainer, templateRef));
   }
 }
 var _whenDefault = new Object();

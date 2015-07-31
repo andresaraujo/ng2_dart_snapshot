@@ -16,6 +16,7 @@ enum RecordType {
   PIPE,
   INTERPOLATE,
   SAFE_PROPERTY,
+  COLLECTION_LITERAL,
   SAFE_INVOKE_METHOD,
   DIRECTIVE_LIFECYCLE
 }
@@ -32,13 +33,24 @@ class ProtoRecord {
   String expressionAsString;
   bool lastInBinding;
   bool lastInDirective;
+  bool argumentToPureFunction;
+  bool referencedBySelf;
   ProtoRecord(this.mode, this.name, this.funcOrValue, this.args, this.fixedArgs,
       this.contextIndex, this.directiveIndex, this.selfIndex,
       this.bindingRecord, this.expressionAsString, this.lastInBinding,
-      this.lastInDirective) {}
+      this.lastInDirective, this.argumentToPureFunction,
+      this.referencedBySelf) {}
   bool isPureFunction() {
     return identical(this.mode, RecordType.INTERPOLATE) ||
-        identical(this.mode, RecordType.PRIMITIVE_OP);
+        identical(this.mode, RecordType.COLLECTION_LITERAL);
+  }
+  bool isUsedByOtherRecord() {
+    return !this.lastInBinding || this.referencedBySelf;
+  }
+  bool shouldBeChecked() {
+    return this.argumentToPureFunction ||
+        this.lastInBinding ||
+        this.isPureFunction();
   }
   bool isPipeRecord() {
     return identical(this.mode, RecordType.PIPE);

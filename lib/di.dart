@@ -10,13 +10,10 @@ export "src/di/metadata.dart"
         InjectMetadata,
         OptionalMetadata,
         InjectableMetadata,
-        VisibilityMetadata,
         SelfMetadata,
-        ParentMetadata,
-        AncestorMetadata,
-        UnboundedMetadata,
-        DependencyMetadata,
-        DEFAULT_VISIBILITY;
+        HostMetadata,
+        SkipSelfMetadata,
+        DependencyMetadata;
 // we have to reexport * because Dart and TS export two different sets of types
 export "src/di/decorators.dart";
 export "src/di/forward_ref.dart"
@@ -25,6 +22,7 @@ export "src/di/injector.dart"
     show
         Injector,
         ProtoInjector,
+        BindingWithVisibility,
         DependencyProvider,
         PUBLIC_AND_PRIVATE,
         PUBLIC,
@@ -37,7 +35,6 @@ export "src/di/exceptions.dart"
     show
         NoBindingError,
         AbstractBindingError,
-        AsyncBindingError,
         CyclicDependencyError,
         InstantiationError,
         InvalidBindingError,

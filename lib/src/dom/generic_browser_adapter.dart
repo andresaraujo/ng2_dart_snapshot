@@ -8,10 +8,10 @@ import "dom_adapter.dart" show DomAdapter;
  * Provides DOM operations in any browser environment.
  */
 class GenericBrowserDomAdapter extends DomAdapter {
-  List<dynamic> getDistributedNodes(el) {
-    return el.getDistributedNodes();
+  List<dynamic> getDistributedNodes(dynamic el) {
+    return ((el as dynamic)).getDistributedNodes();
   }
-  resolveAndSetHref(el, String baseUrl, String href) {
+  resolveAndSetHref(dynamic el, String baseUrl, String href) {
     el.href = href == null ? baseUrl : baseUrl + "/../" + href;
   }
   List<dynamic> cssToRules(String css) {

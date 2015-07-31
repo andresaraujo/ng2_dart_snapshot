@@ -75,7 +75,7 @@ class DatePipe extends BasePipe implements PipeFactory {
     "mediumTime": "jms",
     "shortTime": "jm"
   };
-  String transform(value, List<dynamic> args) {
+  String transform(dynamic value, List<dynamic> args) {
     String pattern =
         isPresent(args) && args.length > 0 ? args[0] : "mediumDate";
     if (isNumber(value)) {
@@ -86,7 +86,7 @@ class DatePipe extends BasePipe implements PipeFactory {
     }
     return DateFormatter.format(value, defaultLocale, pattern);
   }
-  bool supports(obj) {
+  bool supports(dynamic obj) {
     return isDate(obj) || isNumber(obj);
   }
   Pipe create(ChangeDetectorRef cdRef) {

@@ -18,7 +18,7 @@ class LocationStrategy {
   void back() {
     throw _abstract();
   }
-  void onPopState(fn) {
+  void onPopState(dynamic /* (_) => any */ fn) {
     throw _abstract();
   }
   String getBaseHref() {

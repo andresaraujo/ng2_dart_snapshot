@@ -59,7 +59,7 @@ class URLSearchParams {
     });
     return ListWrapper.join(paramsList, "&");
   }
-  void delete(param) {
+  void delete(String param) {
     MapWrapper.delete(this.paramsMap, param);
   }
 }
